@@ -1,1 +1,180 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
+@layer base {
+  * {
+    -webkit-tap-highlight-color: transparent;
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply font-body text-slate-800 bg-slate-50;
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  h1, h2, h3, h4, h5 {
+    @apply font-display;
+  }
+}
+
+@layer components {
+  /* Mobile-first card */
+  .card {
+    @apply bg-white rounded-2xl shadow-sm border border-slate-100;
+  }
+
+  .card-elevated {
+    @apply bg-white rounded-2xl shadow-md border border-slate-100;
+  }
+
+  /* Buttons */
+  .btn-primary {
+    @apply bg-saffron-500 hover:bg-saffron-600 active:bg-saffron-700 text-white font-semibold
+           px-5 py-3 rounded-xl transition-all duration-150 active:scale-95 
+           disabled:opacity-50 disabled:cursor-not-allowed text-sm;
+  }
+
+  .btn-secondary {
+    @apply bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-semibold
+           px-5 py-3 rounded-xl transition-all duration-150 active:scale-95 text-sm;
+  }
+
+  .btn-ocean {
+    @apply bg-ocean-500 hover:bg-ocean-600 active:bg-ocean-700 text-white font-semibold
+           px-5 py-3 rounded-xl transition-all duration-150 active:scale-95 text-sm;
+  }
+
+  .btn-ghost {
+    @apply hover:bg-slate-100 active:bg-slate-200 text-slate-600 font-medium
+           px-4 py-2 rounded-xl transition-all duration-150 text-sm;
+  }
+
+  .btn-danger {
+    @apply bg-red-50 hover:bg-red-100 text-red-600 font-semibold
+           px-4 py-2 rounded-xl transition-all duration-150 active:scale-95 text-sm;
+  }
+
+  /* Input */
+  .input {
+    @apply w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 
+           text-sm text-slate-800 placeholder-slate-400
+           focus:outline-none focus:ring-2 focus:ring-saffron-400 focus:border-transparent
+           transition-all duration-150;
+  }
+
+  .input-error {
+    @apply border-red-300 focus:ring-red-400;
+  }
+
+  .label {
+    @apply text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block;
+  }
+
+  /* Badge */
+  .badge {
+    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold;
+  }
+
+  .badge-saffron {
+    @apply badge bg-saffron-100 text-saffron-700;
+  }
+
+  .badge-ocean {
+    @apply badge bg-ocean-100 text-ocean-700;
+  }
+
+  .badge-green {
+    @apply badge bg-green-100 text-green-700;
+  }
+
+  .badge-red {
+    @apply badge bg-red-100 text-red-600;
+  }
+
+  .badge-slate {
+    @apply badge bg-slate-100 text-slate-600;
+  }
+
+  /* Bottom sheet modal */
+  .sheet-overlay {
+    @apply fixed inset-0 bg-black/40 backdrop-blur-sm z-40 animate-fade-in;
+  }
+
+  .sheet-content {
+    @apply fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl z-50 
+           max-h-[92vh] overflow-y-auto pb-safe animate-slide-up;
+  }
+
+  .sheet-handle {
+    @apply w-10 h-1 bg-slate-200 rounded-full mx-auto mt-3 mb-2;
+  }
+
+  /* Skeleton loader */
+  .skeleton {
+    @apply bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 
+           bg-[length:200%_100%] animate-shimmer rounded-lg;
+  }
+
+  /* Trip day tab */
+  .day-tab {
+    @apply flex-shrink-0 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-150;
+  }
+
+  .day-tab-active {
+    @apply bg-saffron-500 text-white shadow-sm;
+  }
+
+  .day-tab-inactive {
+    @apply bg-white text-slate-500 border border-slate-200;
+  }
+
+  .day-tab-reached {
+    @apply bg-green-100 text-green-700 border border-green-200;
+  }
+
+  /* Category pills */
+  .cat-food { @apply bg-orange-100 text-orange-700; }
+  .cat-transport { @apply bg-blue-100 text-blue-700; }
+  .cat-stay { @apply bg-purple-100 text-purple-700; }
+  .cat-activity { @apply bg-emerald-100 text-emerald-700; }
+  .cat-shopping { @apply bg-pink-100 text-pink-700; }
+  .cat-other { @apply bg-slate-100 text-slate-600; }
+
+  /* Safe area padding */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 16px);
+  }
+
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+}
+
+/* Leaflet map customization */
+.leaflet-container {
+  font-family: 'DM Sans', sans-serif !important;
+  border-radius: 16px;
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: 12px !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12) !important;
+  font-family: 'DM Sans', sans-serif !important;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+
+/* Smooth transitions for page navigation */
+.page-transition {
+  animation: fadeIn 0.25s ease-out;
+}
