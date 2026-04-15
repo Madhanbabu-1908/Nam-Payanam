@@ -24,6 +24,7 @@ router.get('/expenses/:tripId/report', expCtrl.generateReport);
 
 // === AI ROUTES ===
 router.post('/ai/chat', aiCtrl.chat);
+router.post('/ai/generate-plan', aiCtrl.generatePlan);
 router.get('/ai/insights/:tripId', aiCtrl.getInsights);
 
 module.exports = router;
