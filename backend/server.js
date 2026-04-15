@@ -17,7 +17,7 @@ app.use(morgan('combined'));
 app.use(cors({
   origin: [
     process.env.FRONTEND_URL || 'http://localhost:5173',
-    'https://nam-payanam.vercel.app',
+    'https://nam-payanam.vercel.app/',
     /\.vercel\.app$/
   ],
   
