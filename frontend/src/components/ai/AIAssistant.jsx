@@ -3,120 +3,133 @@ import { aiAPI } from '../../utils/api';
 import { Spinner } from '../ui/index.jsx';
 
 const QUICK_QUESTIONS = [
-  '🌦️ What to pack for this trip?',
+  '🌦️ What to pack?',
   '💊 Medical kit essentials?',
-  '🍽️ Local food I must try?',
-  '🔒 Safety tips for this route?',
-  '📸 Best photography spots?',
-  '💡 How to save money?',
+  '🍽️ Local food to try?',
+  '🔒 Safety tips?',
+  '📸 Best photo spots?',
+  '💡 Save money how?',
+  '⛽ Petrol stations en route?',
+  '🏨 Best areas to stay?',
 ];
 
+function formatMsg(text) {
+  // Simple markdown-like formatting
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/\n/g, '<br/>');
+}
+
 export default function AIAssistant({ trip, session }) {
-  const [messages, setMessages] = useState([
-    {
-      role: 'assistant',
-      content: `Vanakkam! 🙏 I'm your AI travel companion for **${trip?.title || 'this trip'}**.\n\nI can help with packing tips, local food suggestions, safety advice, budget tips, and more. What would you like to know?`
-    }
-  ]);
+  const [messages, setMessages] = useState([{
+    role: 'assistant',
+    content: `Vanakkam! 🙏 I'm your AI travel companion for **${trip?.title || 'this trip'}**.\n\nAsk me anything — packing tips, local food, safety advice, budget hacks, or route info!`,
+  }]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef(null);
+  const inputRef = useRef(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  async function sendMessage(text) {
+  async function send(text) {
     const msg = text || input.trim();
-    if (!msg) return;
+    if (!msg || loading) return;
     setInput('');
     setMessages(prev => [...prev, { role: 'user', content: msg }]);
     setLoading(true);
     try {
       const res = await aiAPI.chat(msg, trip?.id);
       setMessages(prev => [...prev, { role: 'assistant', content: res.response }]);
-    } catch (err) {
-      setMessages(prev => [...prev, { role: 'assistant', content: '⚠️ Sorry, I had trouble responding. Please try again.' }]);
+    } catch {
+      setMessages(prev => [...prev, { role: 'assistant', content: '⚠️ I had trouble responding. Please try again.' }]);
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="flex flex-col h-full" style={{ height: 'calc(100vh - 220px)' }}>
-      {/* Chat messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 pb-4">
-        {/* AI header */}
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-8 h-8 bg-gradient-to-br from-saffron-500 to-orange-600 rounded-xl flex items-center justify-center text-sm">🤖</div>
+    <div className="flex flex-col animate-fade-in" style={{ height: 'calc(100svh - 220px)' }}>
+      {/* Chat header */}
+      <div className="px-4 pt-3 pb-2">
+        <div className="flex items-center gap-3 bg-gradient-to-r from-purple-600 to-indigo-700 rounded-2xl px-4 py-3">
+          <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-xl">🤖</div>
           <div>
-            <div className="text-xs font-bold text-slate-700">AI Travel Assistant</div>
-            <div className="text-[10px] text-slate-400">Powered by Groq LLaMA 3.1</div>
+            <div className="font-display font-extrabold text-white text-sm">AI Travel Companion</div>
+            <div className="text-white/60 text-xs">Powered by Groq · LLaMA 3.3</div>
+          </div>
+          <div className="ml-auto flex items-center gap-1.5">
+            <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse-soft" />
+            <span className="text-white/70 text-xs font-semibold">Online</span>
           </div>
         </div>
+      </div>
 
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto px-4 py-2 space-y-3 scrollbar-hide">
         {messages.map((msg, i) => (
-          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed
+          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}>
+            {msg.role === 'assistant' && (
+              <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center text-sm mr-2 mt-1 flex-shrink-0">🤖</div>
+            )}
+            <div className={`max-w-[82%] px-4 py-3 rounded-2xl text-sm leading-relaxed
               ${msg.role === 'user'
-                ? 'bg-saffron-500 text-white rounded-br-sm'
-                : 'bg-white border border-slate-100 text-slate-700 rounded-bl-sm shadow-sm'}`}>
-              {formatMessage(msg.content)}
-            </div>
+                ? 'bg-gradient-to-r from-[#FF6B35] to-[#FF4500] text-white rounded-br-sm'
+                : 'bg-white border border-slate-100 text-slate-700 shadow-sm rounded-bl-sm'}`}
+              dangerouslySetInnerHTML={{ __html: formatMsg(msg.content) }}
+            />
           </div>
         ))}
 
         {loading && (
-          <div className="flex justify-start">
+          <div className="flex items-start gap-2">
+            <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center text-sm flex-shrink-0">🤖</div>
             <div className="bg-white border border-slate-100 rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm">
-              <div className="flex items-center gap-2">
-                <Spinner size="sm" color="saffron" />
-                <span className="text-xs text-slate-400">Thinking...</span>
+              <div className="flex gap-1.5 items-center">
+                {[0,1,2].map(i => (
+                  <div key={i} className="w-2 h-2 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+                ))}
               </div>
             </div>
           </div>
         )}
-
-        {/* Quick questions */}
-        {messages.length === 1 && !loading && (
-          <div>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 mt-3">Quick Questions</p>
-            <div className="flex flex-wrap gap-2">
-              {QUICK_QUESTIONS.map((q, i) => (
-                <button key={i} onClick={() => sendMessage(q.replace(/^[^\s]+\s/, ''))}
-                  className="bg-white border border-slate-200 text-slate-600 text-xs px-3 py-2 rounded-xl 
-                             active:bg-slate-50 transition-colors shadow-sm font-medium">
-                  {q}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
         <div ref={bottomRef} />
       </div>
 
+      {/* Quick questions */}
+      <div className="px-4 pb-2">
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+          {QUICK_QUESTIONS.map((q, i) => (
+            <button key={i} onClick={() => send(q.replace(/^[^\s]+\s/, ''))}
+              className="flex-shrink-0 bg-white border border-slate-200 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-xl hover:border-[#FF6B35] hover:text-[#FF6B35] transition-all active:scale-95">
+              {q}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Input */}
-      <div className="border-t border-slate-100 bg-white px-4 py-3 pb-safe">
-        <div className="flex gap-2 items-end">
-          <textarea
-            className="input flex-1 resize-none text-sm"
+      <div className="px-4 pb-safe">
+        <div className="flex items-center gap-2 bg-white border-2 border-slate-200 rounded-2xl px-3 py-2 focus-within:border-[#FF6B35] transition-all">
+          <input
+            ref={inputRef}
+            className="flex-1 bg-transparent text-sm text-slate-800 placeholder-slate-400 focus:outline-none py-1"
             placeholder="Ask anything about your trip..."
             value={input}
             onChange={e => setInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }}}
-            rows={1}
-            style={{ maxHeight: 80 }}
+            onKeyDown={e => e.key === 'Enter' && !loading && send()}
           />
           <button
-            onClick={() => sendMessage()}
-            disabled={loading || !input.trim()}
-            className="w-10 h-10 bg-saffron-500 rounded-xl flex items-center justify-center flex-shrink-0
-                       disabled:opacity-40 active:scale-90 transition-all"
+            onClick={() => send()}
+            disabled={!input.trim() || loading}
+            className="w-9 h-9 bg-gradient-to-r from-[#FF6B35] to-[#FF4500] text-white rounded-xl flex items-center justify-center disabled:opacity-40 active:scale-95 flex-shrink-0"
           >
             {loading ? <Spinner size="sm" color="white" /> : (
-              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.269 20.876L5.999 12zm0 0h7.5" />
               </svg>
             )}
           </button>
@@ -124,19 +137,4 @@ export default function AIAssistant({ trip, session }) {
       </div>
     </div>
   );
-}
-
-// Format markdown-like message
-function formatMessage(text) {
-  const lines = text.split('\n');
-  return lines.map((line, i) => {
-    // Bold
-    const formatted = line.replace(/\*\*(.*?)\*\*/g, (_, t) => `<strong>${t}</strong>`);
-    return (
-      <span key={i}>
-        <span dangerouslySetInnerHTML={{ __html: formatted }} />
-        {i < lines.length - 1 && <br />}
-      </span>
-    );
-  });
 }
