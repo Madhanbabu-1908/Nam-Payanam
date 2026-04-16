@@ -1,59 +1,28 @@
-/** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{js,jsx}'],
   theme: {
     extend: {
       fontFamily: {
-        display: ['Syne', 'sans-serif'],
-        body: ['DM Sans', 'sans-serif'],
+        display: ['Outfit', 'sans-serif'],
+        body: ['Plus Jakarta Sans', 'sans-serif'],
         tamil: ['Noto Sans Tamil', 'sans-serif'],
       },
       colors: {
-        saffron: {
-          50: '#fff8ed',
-          100: '#ffefd3',
-          200: '#ffdba5',
-          300: '#ffc06d',
-          400: '#ff9a32',
-          500: '#ff7c0a',
-          600: '#f06000',
-          700: '#c74800',
-          800: '#9e3a00',
-          900: '#7f3100',
-        },
-        ocean: {
-          50: '#edfbff',
-          100: '#d6f4ff',
-          200: '#b5ecff',
-          300: '#83e1ff',
-          400: '#48ccfd',
-          500: '#1eb0f4',
-          600: '#068fcb',
-          700: '#0771a4',
-          800: '#0b5e87',
-          900: '#0f4e70',
-        },
-        forest: {
-          50: '#f0fdf6',
-          500: '#22c55e',
-          600: '#16a34a',
-          700: '#15803d',
-        }
+        brand: { 50:'#fff3ee', 100:'#ffe4d4', 200:'#ffcbaa', 300:'#ffa876', 400:'#ff7d40', 500:'#FF6B35', 600:'#FF4500', 700:'#cc3400', 800:'#a12900', 900:'#7a2000' },
+        navy: { 50:'#eff6ff', 100:'#dbeafe', 500:'#0066CC', 600:'#0052A3', 700:'#003d7a', 800:'#002952', 900:'#001a33' },
+        teal: { 50:'#f0fdfa', 500:'#14b8a6', 600:'#0d9488' },
+        emerald: { 50:'#ecfdf5', 100:'#d1fae5', 500:'#10b981', 600:'#059669' },
       },
       animation: {
         'fade-in': 'fadeIn 0.4s ease-out',
-        'slide-up': 'slideUp 0.4s ease-out',
+        'slide-up': 'slideUp 0.35s cubic-bezier(0.34,1.56,0.64,1)',
         'slide-down': 'slideDown 0.3s ease-out',
-        'pulse-soft': 'pulseSoft 2s ease-in-out infinite',
+        'bounce-in': 'bounce-in 0.4s ease-out',
+        'slide-in-right': 'slide-in-right 0.3s ease-out',
+        'pulse-soft': 'pulse-soft 2s ease-in-out infinite',
         'shimmer': 'shimmer 1.5s infinite',
+        'spin': 'spin 0.8s linear infinite',
       },
-      keyframes: {
-        fadeIn: { from: { opacity: 0 }, to: { opacity: 1 } },
-        slideUp: { from: { opacity: 0, transform: 'translateY(16px)' }, to: { opacity: 1, transform: 'translateY(0)' } },
-        slideDown: { from: { opacity: 0, transform: 'translateY(-12px)' }, to: { opacity: 1, transform: 'translateY(0)' } },
-        pulseSoft: { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.6 } },
-        shimmer: { '0%': { backgroundPosition: '-200% 0' }, '100%': { backgroundPosition: '200% 0' } },
-      }
     }
   },
   plugins: []
