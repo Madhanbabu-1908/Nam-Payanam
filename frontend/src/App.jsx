@@ -3,6 +3,7 @@ import { Toaster } from 'react-hot-toast';
 import HomePage from './pages/HomePage.jsx';
 import CreateTripPage from './pages/CreateTripPage.jsx';
 import TripDashboard from './pages/TripDashboard.jsx';
+import PublicTrackerPage from './pages/PublicTrackerPage.jsx';
 
 function JoinRedirect() {
   const { code } = useParams();
@@ -21,7 +22,7 @@ export default function App() {
             background: '#1e293b',
             color: '#f8fafc',
             fontSize: '13px',
-            fontFamily: 'DM Sans, sans-serif',
+            fontFamily: 'Plus Jakarta Sans, sans-serif',
             fontWeight: 600,
             padding: '12px 16px',
             maxWidth: '340px',
@@ -35,6 +36,7 @@ export default function App() {
         <Route path="/create" element={<CreateTripPage />} />
         <Route path="/trip/:code" element={<TripDashboard />} />
         <Route path="/join/:code" element={<JoinRedirect />} />
+        <Route path="/track/:token" element={<PublicTrackerPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
