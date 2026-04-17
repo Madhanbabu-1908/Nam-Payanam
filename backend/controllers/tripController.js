@@ -1,6 +1,8 @@
 const { v4: uuidv4 } = require('uuid');
 const supabase = require('../db/supabase');
-const { generateTripPlans } = require('../services/groqService');
+const { generateTripPlans, generateFollowUpQuestions } = require('../services/groqService');
+const { geocodePlace, calculateRoute, calculateFuel } = require('../services/routeService');
+const { getWeatherForLocation } = require('../services/weatherService');
 
 function generateTripCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -9,26 +11,86 @@ function generateTripCode() {
   return code;
 }
 
-async function getAIPlans(req, res) {
+// GET /api/trips/search-location?q=Chennai
+async function searchLocation(req, res) {
   try {
-    const { startLocation, endLocation, stops, startDate, endDate, groupSize, budget, preferences, routeDistances } = req.body;
-    if (!startLocation || !endLocation || !startDate || !endDate || !groupSize) {
-      return res.status(400).json({ error: 'Missing required trip fields' });
-    }
-    const plans = await generateTripPlans({ startLocation, endLocation, stops, startDate, endDate, groupSize, budget, preferences, routeDistances });
-    res.json({ plans });
+    const { q } = req.query;
+    if (!q || q.length < 2) return res.json({ results: [] });
+    const { searchSuggestions } = require('../services/routeService');
+    const results = await searchSuggestions(q);
+    res.json({ results });
   } catch (err) {
-    console.error('AI Plans error:', err);
-    res.status(500).json({ error: 'Failed to generate AI plans', details: err.message });
+    res.json({ results: [] });
   }
 }
 
+// POST /api/trips/calculate-route
+async function calcRoute(req, res) {
+  try {
+    const { waypoints } = req.body; // [{name, lat, lng}]
+    if (!waypoints || waypoints.length < 2)
+      return res.status(400).json({ error: 'At least 2 waypoints required' });
+    const routeData = await calculateRoute(waypoints);
+    res.json({ routeData });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}
+
+// POST /api/trips/ai-questions
+async function getAIQuestions(req, res) {
+  try {
+    const questions = await generateFollowUpQuestions(req.body);
+    res.json({ questions });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}
+
+// POST /api/trips/ai-plans
+async function getAIPlans(req, res) {
+  try {
+    const { startLocation, endLocation, stops, startDate, endDate,
+            groupSize, budget, preferences, travelMode, accommodation,
+            foodPref, departureTime, waypoints } = req.body;
+
+    if (!startLocation || !endLocation || !startDate || !endDate || !groupSize)
+      return res.status(400).json({ error: 'Missing required trip fields' });
+
+    // Calculate real route if waypoints provided
+    let routeData = null;
+    if (waypoints?.length >= 2) {
+      try { routeData = await calculateRoute(waypoints); } catch (e) {
+        console.warn('Route calc failed, proceeding without:', e.message);
+      }
+    }
+
+    const plans = await generateTripPlans({
+      startLocation, endLocation, stops, startDate, endDate,
+      groupSize, budget, preferences, travelMode, accommodation,
+      foodPref, departureTime, routeData
+    });
+
+    res.json({ plans, routeData });
+  } catch (err) {
+    console.error('AI Plans error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+}
+
+// POST /api/trips  — create trip from AI or manual plan
 async function createTrip(req, res) {
   try {
-    const { title, organizerName, startLocation, endLocation, stops, startDate, endDate, groupSize, selectedPlan, planIndex, sessionId, routeDistances } = req.body;
-    if (!title || !organizerName || !startLocation || !endLocation) {
+    const {
+      title, organizerName, startLocation, startLat, startLng,
+      endLocation, endLat, endLng, stops, startDate, endDate,
+      groupSize, selectedPlan, planIndex, planMode, manualDays,
+      routeData, sessionId, fuelData, preferences
+    } = req.body;
+
+    if (!title || !organizerName || !startLocation || !endLocation)
       return res.status(400).json({ error: 'Missing required fields' });
-    }
+
     let tripCode;
     let exists = true;
     while (exists) {
@@ -36,190 +98,258 @@ async function createTrip(req, res) {
       const { data } = await supabase.from('trips').select('id').eq('trip_code', tripCode).single();
       exists = !!data;
     }
+
     const organizerId = uuidv4();
+
     const { data: trip, error: tripError } = await supabase.from('trips').insert({
-      trip_code: tripCode, title, organizer_id: organizerId, organizer_name: organizerName,
-      start_location: startLocation, end_location: endLocation, stops: stops || [],
+      trip_code: tripCode, title, organizer_id: organizerId,
+      organizer_name: organizerName,
+      start_location: startLocation, start_lat: startLat, start_lng: startLng,
+      end_location: endLocation, end_lat: endLat, end_lng: endLng,
+      stops: stops || [], route_data: routeData || null,
       start_date: startDate, end_date: endDate, group_size: groupSize,
-      ai_plan: selectedPlan, selected_plan_index: planIndex || 0, status: 'planning'
+      ai_plan: selectedPlan || null, selected_plan_index: planIndex || 0,
+      plan_mode: planMode || 'ai', fuel_data: fuelData || null,
+      preferences: preferences || {}, status: 'planning',
     }).select().single();
+
     if (tripError) throw tripError;
-    const { data: member, error: memberError } = await supabase.from('trip_members').insert({
-      trip_id: trip.id, member_id: organizerId, nickname: organizerName, is_organizer: true
+
+    // Add organizer as member
+    const { data: member, error: memErr } = await supabase.from('trip_members').insert({
+      trip_id: trip.id, member_id: organizerId,
+      nickname: organizerName, is_organizer: true
     }).select().single();
-    if (memberError) throw memberError;
-    if (routeDistances?.length > 0) {
-      await supabase.from('route_distances').insert(routeDistances.map(d => ({
-        trip_id: trip.id, from_location: d.from, to_location: d.to,
-        distance_km: d.distance_km, duration_minutes: d.duration_minutes
-      })));
+    if (memErr) throw memErr;
+
+    // Link session → trip
+    if (sessionId) {
+      await supabase.from('user_sessions').upsert({ session_id: sessionId, last_seen: new Date().toISOString() }, { onConflict: 'session_id' });
+      await supabase.from('session_trips').upsert({
+        session_id: sessionId, trip_id: trip.id, member_id: organizerId,
+        nickname: organizerName, is_organizer: true
+      }, { onConflict: 'session_id,trip_id' });
     }
-    if (selectedPlan?.days?.length > 0) {
-      const dayInserts = selectedPlan.days.map(day => ({
-        trip_id: trip.id, day_number: day.dayNumber, date: day.date,
-        title: day.title, stops: day.stops, notes: day.notes, is_reached: false
+
+    // Create trip days
+    const days = planMode === 'manual' ? manualDays : selectedPlan?.days;
+    if (days?.length > 0) {
+      // Fetch weather for start location if we have coords
+      let weatherData = null;
+      if (startLat && startLng) {
+        weatherData = await getWeatherForLocation(startLat, startLng);
+      }
+
+      const dayInserts = days.map(day => ({
+        trip_id: trip.id,
+        day_number: day.dayNumber || day.day_number,
+        date: day.date || null,
+        title: day.title,
+        stops: day.stops || [],
+        notes: day.notes || null,
+        is_reached: false,
+        weather_data: weatherData?.find(w => w.date === day.date) || null,
       }));
       await supabase.from('trip_days').insert(dayInserts);
     }
+
+    // Init progress
     await supabase.from('trip_progress').insert({ trip_id: trip.id, current_stop_index: 0 });
-    if (sessionId) {
-      await supabase.from('member_sessions').upsert({
-        session_id: sessionId, trip_id: trip.id, member_id: organizerId,
-        member_row_id: member.id, nickname: organizerName, is_organizer: true,
-        trip_code: tripCode, last_seen: new Date().toISOString()
-      }, { onConflict: 'session_id,trip_code' });
-    }
+
     res.json({ tripId: trip.id, tripCode, organizerId, memberId: member.id, trip });
   } catch (err) {
-    console.error('Create trip error:', err);
-    res.status(500).json({ error: 'Failed to create trip', details: err.message });
+    console.error('Create trip error:', err.message);
+    res.status(500).json({ error: err.message });
   }
 }
 
+// GET /api/trips/:code
 async function getTripByCode(req, res) {
   try {
     const { code } = req.params;
-    const { data: trip, error } = await supabase.from('trips').select('*').eq('trip_code', code.toUpperCase()).single();
-    if (error || !trip) return res.status(404).json({ error: 'Trip not found' });
-    const [{ data: members }, { data: days }, { data: progress }, { data: breakStops }, { data: routeDistances }] = await Promise.all([
+    const { data: trip, error } = await supabase.from('trips').select('*')
+      .eq('trip_code', code.toUpperCase()).neq('status','deleted').single();
+    if (error || !trip) return res.status(404).json({ error: 'Trip not found or deleted' });
+
+    const [{ data: members }, { data: days }, { data: progress }] = await Promise.all([
       supabase.from('trip_members').select('*').eq('trip_id', trip.id).order('joined_at'),
       supabase.from('trip_days').select('*').eq('trip_id', trip.id).order('day_number'),
       supabase.from('trip_progress').select('*').eq('trip_id', trip.id).single(),
-      supabase.from('break_stops').select('*').eq('trip_id', trip.id).order('created_at'),
-      supabase.from('route_distances').select('*').eq('trip_id', trip.id)
     ]);
-    res.json({ trip, members: members || [], days: days || [], progress, breakStops: breakStops || [], routeDistances: routeDistances || [] });
+
+    res.json({ trip, members: members||[], days: days||[], progress });
   } catch (err) {
-    console.error('Get trip error:', err);
     res.status(500).json({ error: 'Failed to get trip' });
   }
 }
 
+// GET /api/trips/my/:sessionId
+async function getMyTrips(req, res) {
+  try {
+    const { sessionId } = req.params;
+    const { data: sessionTrips } = await supabase.from('session_trips')
+      .select('*, trips(*)').eq('session_id', sessionId).order('joined_at', { ascending: false });
+
+    const trips = (sessionTrips || [])
+      .filter(st => st.trips && st.trips.status !== 'deleted')
+      .map(st => ({ ...st.trips, my_nickname: st.nickname, is_organizer: st.is_organizer, member_id: st.member_id }));
+
+    res.json({ trips });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to get trips' });
+  }
+}
+
+// POST /api/trips/:code/join
 async function joinTrip(req, res) {
   try {
     const { code } = req.params;
     const { nickname, sessionId } = req.body;
     if (!nickname?.trim()) return res.status(400).json({ error: 'Nickname required' });
-    const { data: trip, error: tripError } = await supabase.from('trips').select('id, group_size, status').eq('trip_code', code.toUpperCase()).single();
-    if (tripError || !trip) return res.status(404).json({ error: 'Trip not found' });
-    if (trip.status === 'completed') return res.status(400).json({ error: 'This trip has ended' });
+
+    const { data: trip } = await supabase.from('trips').select('id,group_size,status')
+      .eq('trip_code', code.toUpperCase()).single();
+    if (!trip) return res.status(404).json({ error: 'Trip not found' });
+    if (trip.status === 'completed') return res.status(400).json({ error: 'Trip has ended' });
+    if (trip.status === 'deleted') return res.status(404).json({ error: 'Trip not found or deleted' });
+
     const { count } = await supabase.from('trip_members').select('*', { count: 'exact', head: true }).eq('trip_id', trip.id);
     if (count >= trip.group_size) return res.status(400).json({ error: 'Group is full' });
-    const { data: existing } = await supabase.from('trip_members').select('id').eq('trip_id', trip.id).eq('nickname', nickname.trim()).single();
-    if (existing) return res.status(400).json({ error: 'Nickname already taken' });
-    const { data: member, error: memberError } = await supabase.from('trip_members').insert({ trip_id: trip.id, nickname: nickname.trim(), is_organizer: false }).select().single();
-    if (memberError) throw memberError;
-    if (sessionId) {
-      await supabase.from('member_sessions').upsert({
-        session_id: sessionId, trip_id: trip.id, member_id: uuidv4(),
-        member_row_id: member.id, nickname: nickname.trim(), is_organizer: false,
-        trip_code: code.toUpperCase(), last_seen: new Date().toISOString()
-      }, { onConflict: 'session_id,trip_code' });
-    }
-    res.json({ memberId: member.id, member, tripId: trip.id });
-  } catch (err) {
-    console.error('Join trip error:', err);
-    res.status(500).json({ error: 'Failed to join trip' });
-  }
-}
 
-async function getSessionTrips(req, res) {
-  try {
-    const { sessionId } = req.params;
-    const { data: sessions } = await supabase.from('member_sessions').select('*').eq('session_id', sessionId).order('last_seen', { ascending: false });
-    if (!sessions?.length) return res.json({ trips: [] });
-    const tripCodes = sessions.map(s => s.trip_code);
-    const { data: trips } = await supabase.from('trips').select('id, trip_code, title, start_location, end_location, start_date, end_date, status, group_size').in('trip_code', tripCodes);
-    const enriched = sessions.map(s => { const trip = trips?.find(t => t.trip_code === s.trip_code); return trip ? { ...s, trip } : null; }).filter(Boolean);
-    res.json({ trips: enriched });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to get session trips' });
-  }
-}
+    const { data: existing } = await supabase.from('trip_members').select('id,member_id')
+      .eq('trip_id', trip.id).eq('nickname', nickname.trim()).single();
+    if (existing) return res.status(400).json({ error: 'Nickname already taken in this trip' });
 
-async function touchSession(req, res) {
-  try {
-    const { sessionId, tripCode } = req.body;
-    await supabase.from('member_sessions').update({ last_seen: new Date().toISOString() }).eq('session_id', sessionId).eq('trip_code', tripCode);
-    res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: 'Failed' }); }
-}
-
-async function removeMember(req, res) {
-  try {
-    const { tripId, memberId } = req.params;
-    const { organizerId } = req.body;
-    const { data: organizer } = await supabase.from('trip_members').select('is_organizer').eq('trip_id', tripId).eq('member_id', organizerId).single();
-    if (!organizer?.is_organizer) return res.status(403).json({ error: 'Only organizer can remove members' });
-    const { error } = await supabase.from('trip_members').delete().eq('id', memberId).eq('trip_id', tripId).eq('is_organizer', false);
+    const { data: member, error } = await supabase.from('trip_members').insert({
+      trip_id: trip.id, nickname: nickname.trim(), is_organizer: false
+    }).select().single();
     if (error) throw error;
-    res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: 'Failed to remove member' }); }
+
+    if (sessionId) {
+      await supabase.from('user_sessions').upsert({ session_id: sessionId, last_seen: new Date().toISOString() }, { onConflict: 'session_id' });
+      await supabase.from('session_trips').upsert({
+        session_id: sessionId, trip_id: trip.id,
+        member_id: member.member_id, nickname: nickname.trim(), is_organizer: false
+      }, { onConflict: 'session_id,trip_id' });
+    }
+
+    res.json({ memberId: member.id, memberUUID: member.member_id, member, tripId: trip.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 }
 
+// DELETE /api/trips/:tripId  — hard delete
 async function deleteTrip(req, res) {
   try {
     const { tripId } = req.params;
     const { organizerId } = req.body;
-    if (!organizerId) return res.status(400).json({ error: 'Organizer ID required' });
-    const { data: trip } = await supabase.from('trips').select('organizer_id, trip_code').eq('id', tripId).single();
-    if (!trip) return res.status(404).json({ error: 'Trip not found' });
-    if (trip.organizer_id !== organizerId) return res.status(403).json({ error: 'Only the trip organizer can delete this group' });
-    await supabase.from('member_sessions').delete().eq('trip_id', tripId);
-    const { error } = await supabase.from('trips').delete().eq('id', tripId);
-    if (error) throw error;
-    res.json({ success: true, message: 'Trip and all data deleted' });
+
+    const { data: organizer } = await supabase.from('trip_members').select('is_organizer')
+      .eq('trip_id', tripId).eq('member_id', organizerId).single();
+    if (!organizer?.is_organizer) return res.status(403).json({ error: 'Only organizer can delete trip' });
+
+    // Mark as deleted first (so realtime listeners get notified)
+    await supabase.from('trips').update({ status: 'deleted' }).eq('id', tripId);
+
+    // Hard delete after short delay
+    setTimeout(async () => {
+      await supabase.from('trips').delete().eq('id', tripId);
+    }, 2000);
+
+    res.json({ success: true });
   } catch (err) {
-    console.error('Delete trip error:', err);
-    res.status(500).json({ error: 'Failed to delete trip', details: err.message });
+    res.status(500).json({ error: err.message });
   }
 }
 
+// DELETE /api/trips/:tripId/members/:memberId
+async function removeMember(req, res) {
+  try {
+    const { tripId, memberId } = req.params;
+    const { organizerId } = req.body;
+    const { data: org } = await supabase.from('trip_members').select('is_organizer')
+      .eq('trip_id', tripId).eq('member_id', organizerId).single();
+    if (!org?.is_organizer) return res.status(403).json({ error: 'Only organizer can remove members' });
+
+    await supabase.from('trip_members').delete().eq('id', memberId).eq('trip_id', tripId).eq('is_organizer', false);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}
+
+// PATCH /api/trips/:tripId/status
 async function updateTripStatus(req, res) {
   try {
     const { tripId } = req.params;
     const { status, organizerId } = req.body;
-    const { data: organizer } = await supabase.from('trip_members').select('is_organizer').eq('trip_id', tripId).eq('member_id', organizerId).single();
-    if (!organizer?.is_organizer) return res.status(403).json({ error: 'Only organizer can update trip status' });
-    const { data: trip, error } = await supabase.from('trips').update({ status, updated_at: new Date().toISOString() }).eq('id', tripId).select().single();
-    if (error) throw error;
-    if (status === 'active') await supabase.from('trip_progress').update({ started_at: new Date().toISOString() }).eq('trip_id', tripId);
-    else if (status === 'completed') await supabase.from('trip_progress').update({ completed_at: new Date().toISOString() }).eq('trip_id', tripId);
-    res.json({ trip });
-  } catch (err) { res.status(500).json({ error: 'Failed to update status' }); }
+    const { data: org } = await supabase.from('trip_members').select('is_organizer')
+      .eq('trip_id', tripId).eq('member_id', organizerId).single();
+    if (!org?.is_organizer) return res.status(403).json({ error: 'Only organizer can update status' });
+
+    await supabase.from('trips').update({ status, updated_at: new Date().toISOString() }).eq('id', tripId);
+    if (status === 'active')
+      await supabase.from('trip_progress').update({ started_at: new Date().toISOString() }).eq('trip_id', tripId);
+    if (status === 'completed')
+      await supabase.from('trip_progress').update({ completed_at: new Date().toISOString() }).eq('trip_id', tripId);
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 }
 
+// PATCH /api/trips/:tripId/progress
 async function updateProgress(req, res) {
   try {
     const { tripId } = req.params;
-    const { currentStopIndex, dayReached } = req.body;
-    await supabase.from('trip_progress').update({ current_stop_index: currentStopIndex, updated_at: new Date().toISOString() }).eq('trip_id', tripId);
-    if (dayReached !== undefined) await supabase.from('trip_days').update({ is_reached: true }).eq('trip_id', tripId).eq('day_number', dayReached);
+    const { currentStopIndex, lat, lng, speed, dayReached } = req.body;
+
+    const updates = { updated_at: new Date().toISOString() };
+    if (currentStopIndex !== undefined) updates.current_stop_index = currentStopIndex;
+    if (lat !== undefined) { updates.current_lat = lat; updates.current_lng = lng; }
+    if (speed !== undefined) updates.current_speed = speed;
+
+    await supabase.from('trip_progress').update(updates).eq('trip_id', tripId);
+    if (dayReached !== undefined)
+      await supabase.from('trip_days').update({ is_reached: true }).eq('trip_id', tripId).eq('day_number', dayReached);
+
     res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: 'Failed to update progress' }); }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 }
 
-async function addBreakStop(req, res) {
-  try {
-    const { tripId, dayNumber, addedByNickname, reason, location, activities, durationMinutes } = req.body;
-    if (!tripId || !reason || !addedByNickname) return res.status(400).json({ error: 'tripId, reason, addedByNickname required' });
-    const { data: breakStop, error } = await supabase.from('break_stops').insert({
-      trip_id: tripId, day_number: dayNumber || 1, added_by_nickname: addedByNickname,
-      reason: reason.trim(), location: location?.trim() || null,
-      activities: activities?.trim() || null, duration_minutes: durationMinutes || null
-    }).select().single();
-    if (error) throw error;
-    res.json({ breakStop });
-  } catch (err) { res.status(500).json({ error: 'Failed to add break stop' }); }
-}
-
-async function getBreakStops(req, res) {
+// POST /api/trips/:tripId/announcements
+async function postAnnouncement(req, res) {
   try {
     const { tripId } = req.params;
-    const { data: breakStops, error } = await supabase.from('break_stops').select('*').eq('trip_id', tripId).order('created_at');
+    const { message, type, postedBy } = req.body;
+    const { data, error } = await supabase.from('trip_announcements').insert({
+      trip_id: tripId, message, type: type || 'info', posted_by: postedBy
+    }).select().single();
     if (error) throw error;
-    res.json({ breakStops: breakStops || [] });
-  } catch (err) { res.status(500).json({ error: 'Failed to get break stops' }); }
+    res.json({ announcement: data });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 }
 
-module.exports = { getAIPlans, createTrip, getTripByCode, joinTrip, removeMember, deleteTrip, updateTripStatus, updateProgress, addBreakStop, getBreakStops, getSessionTrips, touchSession };
+// GET /api/trips/:tripId/announcements
+async function getAnnouncements(req, res) {
+  try {
+    const { tripId } = req.params;
+    const { data } = await supabase.from('trip_announcements').select('*')
+      .eq('trip_id', tripId).order('created_at', { ascending: false }).limit(20);
+    res.json({ announcements: data || [] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}
+
+module.exports = {
+  searchLocation, calcRoute, getAIQuestions, getAIPlans, createTrip,
+  getTripByCode, getMyTrips, joinTrip, deleteTrip, removeMember,
+  updateTripStatus, updateProgress, postAnnouncement, getAnnouncements,
+};
