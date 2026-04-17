@@ -1,6 +1,6 @@
 {
   "name": "nam-payanam-frontend",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "scripts": {
     "dev": "vite",
@@ -12,15 +12,10 @@
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.22.0",
     "@supabase/supabase-js": "^2.39.0",
-    "leaflet": "^1.9.4",
-    "react-leaflet": "^4.2.1",
     "zustand": "^4.5.0",
     "axios": "^1.6.7",
-    "date-fns": "^3.3.1",
-    "lucide-react": "^0.323.0",
     "react-hot-toast": "^2.4.1",
-    "html2canvas": "^1.4.1",
-    "jspdf": "^2.5.1"
+    "leaflet": "^1.9.4"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.1",
