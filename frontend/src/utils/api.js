@@ -94,3 +94,17 @@ export async function calculateAllDistances(locations) {
 }
 
 export default api;
+
+export const trackingAPI = {
+  push: (data) => api.post('/tracking/push', data),
+  getLive: (tripId) => api.get(`/tracking/${tripId}/live`),
+  getPath: (tripId) => api.get(`/tracking/${tripId}/path`),
+  createToken: (data) => api.post('/tracking/tokens', data),
+  listTokens: (tripId) => api.get(`/tracking/tokens/${tripId}/list`),
+  deleteToken: (tokenId, organizerId) => api.delete(`/tracking/tokens/${tokenId}`, { data: { organizerId } }),
+  getByToken: (token) => api.get(`/track/${token}`),
+};
+
+export const hotelAPI = {
+  search: (location, budget, checkIn, checkOut) => api.post('/ai/hotels', { location, budget, checkIn, checkOut }),
+};
