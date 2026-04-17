@@ -1,237 +1,221 @@
 const Groq = require('groq-sdk');
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-const PLANNING_MODEL = 'llama-3.3-70b-versatile';
-const FAST_MODEL = 'llama-3.1-8b-instant';
 
-// ── Real cost research prompt ────────────────────────────────────────────────
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
+// 4-model smart rotation queue — silent to user
+const MODEL_QUEUE = [
+  { id: 'llama-3.3-70b-versatile',   label: 'primary',   maxTokens: 6000 },
+  { id: 'llama-3.1-70b-versatile',   label: 'secondary', maxTokens: 6000 },
+  { id: 'llama-3.1-8b-instant',      label: 'fast',      maxTokens: 4000 },
+  { id: 'gemma2-9b-it',              label: 'fallback',  maxTokens: 3000 },
+];
+
+const CHAT_MODEL_QUEUE = [
+  { id: 'llama-3.1-8b-instant',  maxTokens: 600 },
+  { id: 'gemma2-9b-it',          maxTokens: 500 },
+  { id: 'llama-3.3-70b-versatile', maxTokens: 600 },
+];
+
+// Track per-model cooldown
+const modelCooldowns = {};
+
+function isModelCooling(modelId) {
+  const coolUntil = modelCooldowns[modelId];
+  return coolUntil && Date.now() < coolUntil;
+}
+
+function setCooldown(modelId, ms = 60000) {
+  modelCooldowns[modelId] = Date.now() + ms;
+  console.log(`[Groq] Model ${modelId} cooling for ${ms/1000}s`);
+}
+
+async function callWithFallback(queue, messages, systemPrompt = null) {
+  const msgs = systemPrompt
+    ? [{ role: 'system', content: systemPrompt }, ...messages]
+    : messages;
+
+  for (const model of queue) {
+    if (isModelCooling(model.id)) {
+      console.log(`[Groq] Skipping ${model.id} (cooling)`);
+      continue;
+    }
+    try {
+      console.log(`[Groq] Trying ${model.id}`);
+      const resp = await groq.chat.completions.create({
+        model: model.id,
+        messages: msgs,
+        temperature: 0.7,
+        max_tokens: model.maxTokens,
+      });
+      return resp.choices[0]?.message?.content || '';
+    } catch (err) {
+      const status = err?.status || err?.response?.status;
+      if (status === 429) {
+        setCooldown(model.id, 90000); // 90s cooldown on rate limit
+        console.log(`[Groq] Rate limited on ${model.id}, trying next`);
+        await new Promise(r => setTimeout(r, 300));
+        continue;
+      }
+      if (status === 503 || status === 502) {
+        setCooldown(model.id, 30000);
+        continue;
+      }
+      throw err; // non-rate-limit errors bubble up
+    }
+  }
+  throw new Error('All AI models are currently busy. Please try again in a minute.');
+}
+
+// ── Generate 3 trip plans ────────────────────────────────────
 async function generateTripPlans(tripData) {
   const {
-    startLocation, endLocation, stops, startDate, endDate, groupSize,
-    budget, budgetAmount, preferences, routeDistances,
-    transportType, vehicleType, stayPreferences, dayAssignments, planningAnswers
+    startLocation, endLocation, stops, startDate, endDate,
+    groupSize, budget, preferences, routeData, travelMode,
+    accommodation, foodPref, departureTime
   } = tripData;
 
-  const durationDays = Math.max(1, Math.round((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)));
-  const allLocations = [startLocation, ...(stops || []), endLocation];
+  const durationDays = Math.max(1,
+    Math.round((new Date(endDate) - new Date(startDate)) / 86400000));
 
-  // Build real distance context
-  let distanceContext = '';
-  let totalKm = 0, totalDriveMin = 0;
-  if (routeDistances?.length > 0) {
-    distanceContext = '\nVERIFIED ROUTE DISTANCES (OSRM real data — use exactly):\n';
-    routeDistances.forEach(d => {
-      distanceContext += `  • ${d.from} → ${d.to}: ${d.distance_km} km, ~${Math.floor(d.duration_minutes/60)}h ${d.duration_minutes%60}min\n`;
-      totalKm += parseFloat(d.distance_km || 0);
-      totalDriveMin += parseInt(d.duration_minutes || 0);
-    });
-    distanceContext += `  Total: ${totalKm.toFixed(1)} km, ~${Math.floor(totalDriveMin/60)}h ${totalDriveMin%60}min driving\n`;
+  // Build route context from real OSRM data
+  let routeContext = '';
+  if (routeData?.segments?.length > 0) {
+    const segs = routeData.segments.map(s =>
+      `${s.from} → ${s.to}: ${s.distanceKm}km, ${s.durationText}`).join('\n');
+    routeContext = `\nREAL ROUTE DATA (from OSRM):\nTotal distance: ${routeData.totalDistanceKm}km\nTotal driving time: ${routeData.totalDurationText}\nSegments:\n${segs}`;
   }
 
-  // Build transport context
-  const transport = transportType === 'public'
-    ? 'Public transport (bus/train)'
-    : vehicleType === 'bike' ? 'Own two-wheeler' : 'Own car';
+  const prompt = `You are an expert Indian travel planner with deep knowledge of Indian roads, culture, and tourism.
 
-  // Build fuel cost for own vehicle
-  let fuelNote = '';
-  if (transportType === 'own_vehicle') {
-    const fuelRate = vehicleType === 'bike' ? 45 : 12; // km/l approx
-    const fuelPrice = vehicleType === 'bike' ? 105 : 100; // ₹/litre
-    const litres = totalKm > 0 ? totalKm / fuelRate : 0;
-    const fuelCost = Math.round(litres * fuelPrice);
-    fuelNote = `\nFuel estimate: ~${litres.toFixed(1)} litres × ₹${fuelPrice} = ₹${fuelCost} total (÷ ${groupSize} = ₹${Math.round(fuelCost/groupSize)}/person)\n`;
-  } else {
-    const busKmRate = 1.2, trainKmRate = 0.6;
-    const busCost = Math.round(totalKm * busKmRate * groupSize);
-    fuelNote = `\nPublic transport estimate: ~₹${busCost} total for group (based on ₹${busKmRate}/km bus fare)\n`;
-  }
-
-  // Build stay context
-  const stayContext = stayPreferences?.length > 0
-    ? `\nPlanned stays: ${stayPreferences.map(s => `${s.location} (Day ${s.day}): ${s.preference}`).join(', ')}`
-    : '';
-
-  // Budget constraint
-  const budgetContext = budgetAmount
-    ? `\nORGANISER BUDGET CONSTRAINT: ₹${budgetAmount} per person total. ALL plans MUST fit within or near this budget. If budget is tight, suggest which places to skip or combine.`
-    : '';
-
-  // Day assignments
-  const dayContext = dayAssignments && Object.keys(dayAssignments).length > 0
-    ? `\nUser's day plan: ${Object.entries(dayAssignments).map(([day, places]) => `Day ${day}: ${places}`).join('; ')}`
-    : '';
-
-  const prompt = `You are an expert Indian travel cost researcher and planner. Create EXACTLY 3 trip plans.
-
-TRIP DETAILS:
-- Route: ${allLocations.join(' → ')}
+Trip Details:
+- Start: ${startLocation}
+- Stops: ${stops?.map(s=>s.name||s).join(', ') || 'none specified'}
+- End: ${endLocation}
 - Dates: ${startDate} to ${endDate} (${durationDays} days)
 - Group: ${groupSize} people
-- Transport: ${transport}
-- Budget preference: ${budget || 'moderate'}${budgetContext}
-- Special notes: ${preferences || 'none'}
-${distanceContext}${fuelNote}${stayContext}${dayContext}
+- Travel mode: ${travelMode || 'road'}
+- Accommodation: ${accommodation || 'moderate hotel'}
+- Food preference: ${foodPref || 'no restriction'}
+- Preferred departure time each day: ${departureTime || '7:00 AM'}
+- Budget type: ${budget || 'moderate'}
+- Special preferences: ${preferences || 'none'}
+${routeContext}
 
-CRITICAL PRICING RULES — Do NOT use generic/hardcoded values:
-1. Research REAL current prices for each specific location in the route
-2. For accommodation: Look up actual hotels/lodges at each stop city. Budget lodge: ₹500-1500/night, Mid: ₹1500-3500, Premium: ₹3500+
-3. For food: Research local restaurant prices at each city. South Indian meal: ₹80-200, Restaurant: ₹200-600/person
-4. For fuel/transport: Use the calculated fuel cost above
-5. For activities: Research actual entry fees for monuments, parks, etc. at each specific location
-6. Multiply accommodation × nights, food × days × 3 meals, activities per location
-7. The 3 plans should reflect BUDGET (₹800-1500/person/day), MODERATE (₹1500-3000/person/day), PREMIUM (₹3000+/person/day) for THIS specific route
+Create exactly 3 distinct trip plans as a JSON array. NO markdown, NO explanation — ONLY the raw JSON array.
 
-HOTEL RESEARCH: For each overnight stop, list 2-3 REAL hotel names with approximate prices:
-- Budget: local lodges, OYO-style hotels
-- Moderate: business hotels, mid-range
-- Premium: resort/heritage properties if available in that area
-
-ACTIVITIES: List real attractions with actual entry fees for each city in the route.
-
-Respond ONLY with a valid JSON array of exactly 3 objects. No markdown. No preamble.
-
-Each plan:
+Each plan object:
 {
-  "planName": "string (Budget Explorer / Comfort Journey / Premium Experience)",
-  "summary": "2-3 sentences specific to this route and its real attractions",
-  "totalDistance": "string e.g. '${totalKm.toFixed(0)} km'",
-  "estimatedDriveTime": "string",
-  "transportDetails": "string describing specific transport options for this route",
+  "planName": "string",
+  "summary": "string (2-3 sentences)",
+  "totalDistanceKm": number,
+  "totalDrivingHours": number,
   "estimatedCost": {
-    "perPerson": number (calculated from real prices below),
-    "total": number (perPerson × ${groupSize}),
-    "breakdown": {
-      "transport": number (fuel or bus/train cost per person),
-      "accommodation": number (hotel cost per person for all nights),
-      "food": number (meals per person for all days),
-      "activities": number (entry fees + activities per person),
-      "miscellaneous": number
-    },
-    "priceJustification": "string explaining how each number was calculated"
+    "perPerson": number,
+    "total": number,
+    "breakdown": { "transport": number, "accommodation": number, "food": number, "activities": number, "miscellaneous": number }
   },
-  "highlights": ["3-4 specific attractions in this route"],
+  "highlights": ["4 key highlights"],
+  "prerequisites": ["5 preparation items"],
   "bestFor": "string",
-  "hotels": [
-    {
-      "location": "city name",
-      "day": number,
-      "options": [
-        { "name": "hotel name", "type": "budget|moderate|premium", "pricePerNight": number, "notes": "brief note" }
-      ]
-    }
-  ],
-  "amenities": {
-    "accommodation": ["specific hotel names at each stop"],
-    "dining": ["specific restaurant names or food types per city"],
-    "facilities": ["specific petrol bunks, hospitals, ATMs en route"],
-    "activities": ["specific attractions with entry fees"]
-  },
   "days": [
     {
       "dayNumber": number,
       "title": "string",
       "date": "YYYY-MM-DD",
-      "route": "string with real distance e.g. 'City A → City B, 145 km, ~2.5h'",
+      "departureTime": "HH:MM",
       "stops": [
         {
           "name": "string",
-          "type": "start|stop|stay|attraction|food|end",
+          "type": "start|stop|stay|attraction|food|fuel|rest|end",
           "duration": "string",
-          "description": "specific description with real info",
+          "description": "string (2 sentences with local tips)",
           "estimatedCost": number,
-          "amenities": ["nearby facilities"],
-          "lat": null,
-          "lng": null
+          "amenities": ["nearby amenities list"],
+          "lat": number or null,
+          "lng": number or null
         }
       ],
-      "dailyBudget": number,
-      "notes": "practical notes for this day"
+      "dailyBudgetPerPerson": number,
+      "drivingDistanceKm": number,
+      "drivingDuration": "string",
+      "notes": "string",
+      "weatherTip": "string"
     }
   ],
-  "tips": ["3-4 route-specific practical tips"],
-  "warnings": ["1-2 important warnings for this route"],
-  "emergencyContacts": ["Police: 100", "Ambulance: 108"]
+  "tips": ["4 practical tips"],
+  "warnings": ["important warnings"],
+  "fuelEstimate": { "totalLitres": number, "estimatedCostAt100PerLitre": number }
 }`;
 
-  const response = await groq.chat.completions.create({
-    model: PLANNING_MODEL,
-    messages: [{ role: 'user', content: prompt }],
-    temperature: 0.65,
-    max_tokens: 8000,
-  });
+  const raw = await callWithFallback(MODEL_QUEUE, [{ role: 'user', content: prompt }]);
+  const cleaned = raw.replace(/```json\n?|\n?```/g, '').trim();
 
-  let content = response.choices[0]?.message?.content || '[]';
-  content = content.replace(/```json\n?|\n?```/g, '').trim();
-  // Extract JSON array
-  const start = content.indexOf('[');
-  const end = content.lastIndexOf(']') + 1;
-  if (start !== -1 && end > start) content = content.slice(start, end);
-  const plans = JSON.parse(content);
+  // Try to extract JSON array even if model added text around it
+  const match = cleaned.match(/\[[\s\S]*\]/);
+  if (!match) throw new Error('AI returned invalid plan format. Please try again.');
+
+  const plans = JSON.parse(match[0]);
   return Array.isArray(plans) ? plans.slice(0, 3) : [];
 }
 
-// ── Hotel search near a location ─────────────────────────────────────────────
-async function searchHotelsNearby(location, budget, checkIn, checkOut) {
-  const nights = checkIn && checkOut
-    ? Math.max(1, Math.round((new Date(checkOut) - new Date(checkIn)) / 86400000))
-    : 1;
+// ── AI preference interview (ask follow-up Qs) ───────────────
+async function generateFollowUpQuestions(basicInfo) {
+  const prompt = `A user wants to plan a trip from ${basicInfo.startLocation} to ${basicInfo.endLocation} for ${basicInfo.groupSize} people over ${basicInfo.days} days.
 
-  const prompt = `List 6 real hotels in ${location}, India for ${nights} night(s).
-Budget type: ${budget || 'moderate'} (budget=₹500-1500/night, moderate=₹1500-3500/night, premium=₹3500+/night)
-Check-in: ${checkIn || 'flexible'}, Check-out: ${checkOut || 'flexible'}
-
-Return ONLY a JSON array. No markdown.
+Generate 5 smart follow-up questions to better plan this trip. Return ONLY a JSON array of question objects:
 [
   {
-    "name": "hotel name",
-    "type": "budget|moderate|premium",
-    "pricePerNight": number,
-    "totalPrice": number (pricePerNight × ${nights}),
-    "location": "area/neighborhood in ${location}",
-    "amenities": ["wifi","ac","parking","restaurant"],
-    "rating": number (4.0-4.8),
-    "bookingNote": "brief note e.g. 'Near bus stand, popular with families'"
+    "id": "travel_mode",
+    "question": "string",
+    "type": "single",
+    "options": ["option1", "option2", "option3"]
   }
-]`;
+]
+Question IDs must be: travel_mode, accommodation, food_pref, departure_time, special_needs
+Make options specific to Indian travel context.`;
 
-  const response = await groq.chat.completions.create({
-    model: FAST_MODEL,
-    messages: [{ role: 'user', content: prompt }],
-    temperature: 0.5,
-    max_tokens: 1500,
-  });
-
-  let content = response.choices[0]?.message?.content || '[]';
-  content = content.replace(/```json\n?|\n?```/g, '').trim();
-  const start = content.indexOf('[');
-  const end = content.lastIndexOf(']') + 1;
-  if (start !== -1) content = content.slice(start, end);
-  return JSON.parse(content);
+  const raw = await callWithFallback(CHAT_MODEL_QUEUE, [{ role: 'user', content: prompt }]);
+  const match = raw.replace(/```json\n?|\n?```/g,'').trim().match(/\[[\s\S]*\]/);
+  if (!match) return getDefaultQuestions();
+  try { return JSON.parse(match[0]); } catch { return getDefaultQuestions(); }
 }
 
-// ── AI Chat ──────────────────────────────────────────────────────────────────
+function getDefaultQuestions() {
+  return [
+    { id: 'travel_mode', question: 'How are you planning to travel?', type: 'single',
+      options: ['Road trip (car/bike)', 'Mix of road + train', 'Train for long legs', 'Bus throughout'] },
+    { id: 'accommodation', question: 'What type of stay do you prefer?', type: 'single',
+      options: ['Budget lodge/dharamshala', 'Mid-range hotel', 'Resort/homestay', 'Decide en-route'] },
+    { id: 'food_pref', question: 'Any food preferences for the group?', type: 'single',
+      options: ['Pure vegetarian', 'Non-veg welcome', 'Jain food needed', 'No restriction'] },
+    { id: 'departure_time', question: 'What time does your group usually start each day?', type: 'single',
+      options: ['Early bird (5-6 AM)', 'Morning (7-8 AM)', 'Late morning (9-10 AM)', 'Flexible'] },
+    { id: 'special_needs', question: 'Any special requirements?', type: 'single',
+      options: ['Senior citizens in group', 'Children under 10', 'Medical stops needed', 'None'] },
+  ];
+}
+
+// ── AI chat ──────────────────────────────────────────────────
 async function chatWithAI(message, tripContext) {
-  const systemPrompt = `You are Nam Payanam's travel assistant — a friendly, knowledgeable Indian travel guide.
+  const system = `You are Nam Payanam's travel assistant — a friendly, knowledgeable Indian travel guide.
 Trip: ${tripContext?.title || 'group trip'} | Route: ${tripContext?.start_location || ''} → ${tripContext?.end_location || ''} | Group: ${tripContext?.group_size || '?'} people.
-When asked about hotels: provide real hotel names with approximate prices for the specific city.
-Be concise (under 200 words), practical, enthusiastic. Use occasional Tamil/Hindi travel terms naturally.`;
+Be concise (under 180 words), practical, warm. Use occasional Tamil/Hindi travel phrases naturally.`;
 
-  const response = await groq.chat.completions.create({
-    model: FAST_MODEL,
-    messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: message }],
-    temperature: 0.6,
-    max_tokens: 600,
-  });
-  return response.choices[0]?.message?.content || 'Could not respond. Try again.';
+  return await callWithFallback(CHAT_MODEL_QUEUE,
+    [{ role: 'user', content: message }], system);
 }
 
+// ── Expense insights ─────────────────────────────────────────
 async function generateExpenseInsights(expenses, tripData) {
-  const total = expenses.reduce((s, e) => s + parseFloat(e.amount), 0);
+  const total = expenses.reduce((s,e) => s+parseFloat(e.amount), 0);
   const cats = {};
-  expenses.forEach(e => { cats[e.category] = (cats[e.category] || 0) + parseFloat(e.amount); });
-  const prompt = `Trip: ${tripData.start_location} → ${tripData.end_location}, ${tripData.group_size} people. Total ₹${total}. By category: ${JSON.stringify(cats)}. Give 3-sentence insight + 2 money-saving tips for this specific route. Be concise.`;
-  const r = await groq.chat.completions.create({ model: FAST_MODEL, messages: [{ role: 'user', content: prompt }], temperature: 0.5, max_tokens: 300 });
-  return r.choices[0]?.message?.content || '';
+  expenses.forEach(e => { cats[e.category] = (cats[e.category]||0)+parseFloat(e.amount); });
+
+  const prompt = `Trip expense analysis — ${tripData.group_size} people, ${tripData.start_location} to ${tripData.end_location}.
+Total: ₹${total} | By category: ${JSON.stringify(cats)}
+Give 2-sentence smart insight + 2 tips for future similar trips. Be concise and specific.`;
+
+  return await callWithFallback(CHAT_MODEL_QUEUE, [{ role: 'user', content: prompt }]);
 }
 
-module.exports = { generateTripPlans, searchHotelsNearby, chatWithAI, generateExpenseInsights };
+module.exports = { generateTripPlans, generateFollowUpQuestions, chatWithAI, generateExpenseInsights };
