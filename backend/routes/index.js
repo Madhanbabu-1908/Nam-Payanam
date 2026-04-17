@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
-
 const tripCtrl = require('../controllers/tripController');
 const expCtrl = require('../controllers/expenseController');
 const aiCtrl = require('../controllers/aiController');
+const trackCtrl = require('../controllers/trackingController');
 
 // === TRIP ROUTES ===
 router.post('/trips/ai-plans', tripCtrl.getAIPlans);
@@ -32,5 +32,15 @@ router.delete('/expenses/:expenseId', expCtrl.deleteExpense);
 // === AI ROUTES ===
 router.post('/ai/chat', aiCtrl.chat);
 router.get('/ai/insights/:tripId', aiCtrl.getInsights);
+router.post('/ai/hotels', aiCtrl.hotelsNearby);
+
+// === LIVE TRACKING ROUTES ===
+router.post('/tracking/push', trackCtrl.pushLocation);
+router.get('/tracking/:tripId/live', trackCtrl.getLiveLocation);
+router.get('/tracking/:tripId/path', trackCtrl.getTravelPath);
+router.post('/tracking/tokens', trackCtrl.createTrackingToken);
+router.get('/tracking/tokens/:tripId/list', trackCtrl.listTokens);
+router.delete('/tracking/tokens/:tokenId', trackCtrl.deleteToken);
+router.get('/track/:token', trackCtrl.getByToken); // public, no auth
 
 module.exports = router;
