@@ -238,24 +238,6 @@ export default function TripDashboard() {
             </div>
           ))}
         </div>
-
-        {/* Tab bar — simple icons only (sidebar has labels) */}
-        <div className="tab-bar">
-          {[
-            {id:'itinerary',icon:'📅',label:T.plan},
-            {id:'expenses', icon:'💸',label:T.expenses},
-            {id:'breaks',   icon:'☕',label:T.breaks},
-            {id:'map',      icon:'🗺️',label:T.map},
-            {id:'ai',       icon:'🤖',label:T.ai},
-            {id:'report',   icon:'📊',label:T.report},
-          ].map(tab=>(
-            <button key={tab.id} onClick={()=>setActiveTab(tab.id)}
-              className={`tab-item ${activeTab===tab.id?'tab-active':'tab-inactive'}`}>
-              <span className="text-base">{tab.icon}</span>
-              <span className="text-[9px]">{tab.label}</span>
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* Announcement */}
