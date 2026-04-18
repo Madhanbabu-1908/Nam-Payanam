@@ -245,9 +245,16 @@ async function deleteTrip(req, res) {
     const { tripId } = req.params;
     const { organizerId } = req.body;
 
+    // Check via trip_members OR via trips.organizer_id (handles both fresh and restored sessions)
     const { data: organizer } = await supabase.from('trip_members').select('is_organizer')
       .eq('trip_id', tripId).eq('member_id', organizerId).single();
-    if (!organizer?.is_organizer) return res.status(403).json({ error: 'Only organizer can delete trip' });
+    if (!organizer?.is_organizer) {
+      // Fallback: check trips.organizer_id directly
+      const { data: tripRow } = await supabase.from('trips').select('organizer_id').eq('id', tripId).single();
+      if (tripRow?.organizer_id !== organizerId) {
+        return res.status(403).json({ error: 'Only organizer can delete trip' });
+      }
+    }
 
     // Mark as deleted first (so realtime listeners get notified)
     await supabase.from('trips').update({ status: 'deleted' }).eq('id', tripId);
@@ -286,7 +293,10 @@ async function updateTripStatus(req, res) {
     const { status, organizerId } = req.body;
     const { data: org } = await supabase.from('trip_members').select('is_organizer')
       .eq('trip_id', tripId).eq('member_id', organizerId).single();
-    if (!org?.is_organizer) return res.status(403).json({ error: 'Only organizer can update status' });
+    if (!org?.is_organizer) {
+      const { data: tripRow } = await supabase.from('trips').select('organizer_id').eq('id', tripId).single();
+      if (tripRow?.organizer_id !== organizerId) return res.status(403).json({ error: 'Only organizer can update status' });
+    }
 
     await supabase.from('trips').update({ status, updated_at: new Date().toISOString() }).eq('id', tripId);
     if (status === 'active')
