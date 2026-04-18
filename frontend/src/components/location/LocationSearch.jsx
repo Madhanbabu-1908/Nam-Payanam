@@ -9,7 +9,7 @@ export default function LocationSearch({ value, onChange, placeholder, label, ic
   const timerRef = useRef(null);
   const wrapRef = useRef(null);
 
-  // Sync query if value changes externally (e.g., reset)
+  // Sync query if value changes externally
   useEffect(() => {
     if (value) {
       setQuery(value.label);
@@ -38,26 +38,29 @@ export default function LocationSearch({ value, onChange, placeholder, label, ic
     try {
       const res = await tripAPI.searchLocation(q);
       
-      // DEBUGGING: Check console to see what the API actually returns
-      console.log('API Response for:', q, res);
+      console.log('API Response for:', q, res); // DEBUGGING
 
-      // Handle different API response structures
       let data = [];
       if (Array.isArray(res)) {
-        // Case 1: API returns an array directly
         data = res;
-      } else if (res && res.results) {
-        // Case 2: API returns { results: [...] }        data = res.results;
-      } else if (res && res.features) {
-        // Case 3: GeoJSON format (common for Mapbox/OSM)
-        data = res.features.map(f => ({
-          label: f.place_name || f.display_name,
+      } else if (res.results) {
+        data = res.results;
+      } else if (res.features) {
+        // Handle GeoJSON / Mapbox / OSM Nominatim format
+        data = res.features.map(f => ({          label: f.place_name || f.display_name,
           shortLabel: f.text || f.address?.city || f.address?.town,
           lat: f.center ? f.center[1] : f.lat,
           lng: f.center ? f.center[0] : f.lng,
           type: f.place_type ? f.place_type[0] : 'place'
         }));
       }
+
+      // 👇 ENSURE EVERY RESULT HAS lat/lng — fallback to 0 if missing
+      data = data.map(item => ({
+        ...item,
+        lat: item.lat !== undefined ? item.lat : 0,
+        lng: item.lng !== undefined ? item.lng : 0
+      }));
 
       setResults(data);
       if (data.length > 0) setOpen(true);
@@ -73,7 +76,6 @@ export default function LocationSearch({ value, onChange, placeholder, label, ic
     const q = e.target.value;
     setQuery(q);
     
-    // If cleared, reset value to null
     if (!q) {
       onChange(null);
       setResults([]);
@@ -94,9 +96,9 @@ export default function LocationSearch({ value, onChange, placeholder, label, ic
       lng: r.lng
     };
 
-    setQuery(selectedLoc.label);
-    setOpen(false);
-    setResults([]);    onChange(selectedLoc);
+    setQuery(selectedLoc.label);    setOpen(false);
+    setResults([]);
+    onChange(selectedLoc);
   }
 
   return (
@@ -116,7 +118,6 @@ export default function LocationSearch({ value, onChange, placeholder, label, ic
           value={query}
           onChange={handleInput}
           onFocus={() => {
-            // Only open if we have results already
             if (results.length > 0) setOpen(true);
           }}
           autoComplete="off"
@@ -146,10 +147,6 @@ export default function LocationSearch({ value, onChange, placeholder, label, ic
         )}
       </div>
       {/* Dropdown Results */}
-      {/* Note: z-[9999] ensures it floats above everything. 
-          If parent has overflow-hidden, this might still clip. 
-          Ensure parent cards do NOT have overflow-hidden if possible, 
-          or use Portal for perfect isolation. */}
       {open && results.length > 0 && (
         <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-2xl shadow-xl border border-slate-100 z-[9999] overflow-hidden animate-slide-down max-h-64 overflow-y-auto">
           {results.map((r, i) => (
