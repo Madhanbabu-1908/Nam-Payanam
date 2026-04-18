@@ -1,8 +1,9 @@
 import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import HomePage      from './pages/HomePage.jsx';
-import CreateTripPage from './pages/CreateTripPage.jsx';
-import TripDashboard  from './pages/TripDashboard.jsx';
+import HomePage          from './pages/HomePage.jsx';
+import CreateTripPage    from './pages/CreateTripPage.jsx';
+import TripDashboard     from './pages/TripDashboard.jsx';
+import PublicTrackerPage from './pages/PublicTrackerPage.jsx';
 
 function JoinRedirect() {
   const { code } = useParams();
@@ -14,7 +15,8 @@ export default function App() {
     <BrowserRouter>
       <Toaster position="top-center" toastOptions={{
         duration: 3500,
-        style: { borderRadius:'14px', background:'#1e1b4b', color:'#f8fafc', fontSize:'13px', fontFamily:'DM Sans,sans-serif', fontWeight:600, padding:'12px 16px', maxWidth:'340px' },
+        style: { borderRadius:'14px', background:'#1e1b4b', color:'#f8fafc', fontSize:'13px',
+          fontFamily:'DM Sans,sans-serif', fontWeight:600, padding:'12px 16px', maxWidth:'340px' },
         success: { iconTheme:{ primary:'#10b981', secondary:'#f8fafc' } },
         error:   { iconTheme:{ primary:'#ef4444', secondary:'#f8fafc' } },
       }}/>
@@ -23,6 +25,7 @@ export default function App() {
         <Route path="/create"      element={<CreateTripPage/>}/>
         <Route path="/trip/:code"  element={<TripDashboard/>}/>
         <Route path="/join/:code"  element={<JoinRedirect/>}/>
+        <Route path="/track/:token" element={<PublicTrackerPage/>}/>
         <Route path="*"            element={<Navigate to="/" replace/>}/>
       </Routes>
     </BrowserRouter>
