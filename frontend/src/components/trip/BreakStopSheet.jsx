@@ -18,7 +18,6 @@ export default function BreakStopSheet({ isOpen, onClose, trip, session, days, o
   const [step, setStep] = useState(0); // 0: break details, 1: add expense?
   const [saving, setS] = useState(false);
   const [breakId, setBreakId] = useState(null);
-
   const [form, setForm] = useState({
     reason: '',
     category: 'chai',
@@ -27,7 +26,6 @@ export default function BreakStopSheet({ isOpen, onClose, trip, session, days, o
     durationMinutes: '',
     dayNumber: 1,
   });
-
   const [expForm, setExpForm] = useState({
     addExpense: false,
     title: '',
@@ -37,14 +35,41 @@ export default function BreakStopSheet({ isOpen, onClose, trip, session, days, o
   });
 
   useEffect(() => {
-    if (!isOpen) { setStep(0); setBreakId(null); setForm({ reason:'', category:'chai', location:'', activities:'', durationMinutes:'', dayNumber: days?.[0]?.day_number || 1 }); setExpForm({ addExpense:false, title:'', amount:'', category:'food', splitType:'equal' }); }
-    else if (days?.length) setForm(p => ({ ...p, dayNumber: days.find(d => !d.is_reached)?.day_number || days[days.length-1]?.day_number || 1 }));
+    if (!isOpen) { 
+      setStep(0); 
+      setBreakId(null); 
+      setForm({ 
+        reason:'', 
+        category:'chai', 
+        location:'', 
+        activities:'', 
+        durationMinutes:'', 
+        dayNumber: days?.[0]?.day_number || 1 
+      }); 
+      setExpForm({ 
+        addExpense:false,         title:'', 
+        amount:'', 
+        category:'food', 
+        splitType:'equal' 
+      }); 
+    } else if (days?.length) {
+      // Find first unreached day, else last day
+      const nextDay = days.find(d => !d.is_reached)?.day_number || days[days.length-1]?.day_number || 1;
+      setForm(p => ({ ...p, dayNumber: nextDay }));
+    }
   }, [isOpen, days]);
 
   async function saveBreak() {
     const cat = BREAK_CATEGORIES.find(c => c.id === form.category);
     const reason = form.reason.trim() || `${cat?.label} Break`;
     if (!reason) return toast.error('Add a reason');
+
+    // 👇 Validate day number
+    const maxDay = days?.length > 0 ? Math.max(...days.map(d => d.day_number)) : 15;
+    if (form.dayNumber > maxDay && form.dayNumber !== 0) {
+      return toast.error(`Invalid day. Max allowed: Day ${maxDay}`);
+    }
+
     setS(true);
     try {
       const res = await tripAPI.addBreak({
@@ -58,8 +83,11 @@ export default function BreakStopSheet({ isOpen, onClose, trip, session, days, o
       });
       setBreakId(res.breakStop?.id);
       setStep(1);
-    } catch (err) { toast.error(err.message); }
-    finally { setS(false); }
+    } catch (err) { 
+      toast.error(err.message); 
+    } finally { 
+      setS(false); 
+    }
   }
 
   async function saveWithExpense() {
@@ -68,8 +96,7 @@ export default function BreakStopSheet({ isOpen, onClose, trip, session, days, o
       try {
         const members_res = await fetch(`${import.meta.env.VITE_API_URL}/trips/${trip.trip_code}`);
         // Just use what we have
-        await expenseAPI.add({
-          tripId: trip.id,
+        await expenseAPI.add({          tripId: trip.id,
           dayNumber: form.dayNumber,
           title: expForm.title.trim(),
           amount: parseFloat(expForm.amount),
@@ -81,7 +108,9 @@ export default function BreakStopSheet({ isOpen, onClose, trip, session, days, o
           note: `[break] ${form.reason || 'Break stop'}`,
         });
         toast.success('Break & expense logged! ☕💰');
-      } catch (err) { toast.error('Break saved but expense failed: ' + err.message); }
+      } catch (err) { 
+        toast.error('Break saved but expense failed: ' + err.message); 
+      }
     } else {
       toast.success('Break logged! ☕');
     }
@@ -106,15 +135,17 @@ export default function BreakStopSheet({ isOpen, onClose, trip, session, days, o
             <label className="label">Break Type</label>
             <div className="grid grid-cols-4 gap-2">
               {BREAK_CATEGORIES.map(c => (
-                <button key={c.id} onClick={() => { setForm(p => ({ ...p, category: c.id })); if (!form.reason) setForm(p => ({ ...p, category: c.id, reason: c.label })); }}
-                  className={`flex flex-col items-center gap-1 py-2.5 rounded-xl text-xs font-bold transition-all border-2
-                    ${form.category === c.id ? 'bg-amber-500 text-white border-amber-500 shadow' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>
+                <button key={c.id} onClick={() => { 
+                  setForm(p => ({ ...p, category: c.id })); 
+                  if (!form.reason) setForm(p => ({ ...p, category: c.id, reason: c.label })); 
+                }}
+                className={`flex flex-col items-center gap-1 py-2.5 rounded-xl text-xs font-bold transition-all border-2
+                ${form.category === c.id ? 'bg-amber-500 text-white border-amber-500 shadow' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>
                   <span className="text-lg">{c.icon}</span>
                   <span className="text-[10px] leading-tight text-center">{c.label}</span>
                 </button>
               ))}
-            </div>
-          </div>
+            </div>          </div>
 
           <div>
             <label className="label">Reason / Note *</label>
@@ -163,7 +194,6 @@ export default function BreakStopSheet({ isOpen, onClose, trip, session, days, o
             <p className="text-sm font-bold text-emerald-700">✅ Break logged successfully!</p>
             <p className="text-xs text-emerald-600 mt-0.5">Did you spend anything at this stop?</p>
           </div>
-
           {/* Toggle add expense */}
           <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200">
             <div>
@@ -205,7 +235,7 @@ export default function BreakStopSheet({ isOpen, onClose, trip, session, days, o
                   {EXPENSE_CATEGORIES.map(c => (
                     <button key={c.id} onClick={() => setExpForm(p => ({ ...p, category: c.id }))}
                       className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all
-                        ${expForm.category === c.id ? 'bg-[#FF6B35] text-white' : 'bg-slate-100 text-slate-600'}`}>
+                      ${expForm.category === c.id ? 'bg-[#FF6B35] text-white' : 'bg-slate-100 text-slate-600'}`}>
                       <span>{c.icon}</span>{c.label}
                     </button>
                   ))}
@@ -213,7 +243,6 @@ export default function BreakStopSheet({ isOpen, onClose, trip, session, days, o
               </div>
             </div>
           )}
-
           <div className="flex gap-3">
             <button onClick={() => { toast.success('Break saved ☕'); onAdded(); onClose(); }} className="btn-secondary flex-1">
               Skip Expense
