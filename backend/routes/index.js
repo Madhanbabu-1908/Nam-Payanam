@@ -16,6 +16,7 @@ router.get('/trips/:code', tripCtrl.getTripByCode);
 router.post('/trips/:code/join', tripCtrl.joinTrip);
 router.delete('/trips/:tripId', tripCtrl.deleteTrip);
 router.delete('/trips/:tripId/members/:memberId', tripCtrl.removeMember);
+router.delete('/breaks/:breakId', breakController.deleteBreak);
 router.patch('/trips/:tripId/status', tripCtrl.updateTripStatus);
 router.patch('/trips/:tripId/progress', tripCtrl.updateProgress);
 router.post('/trips/:tripId/announcements', tripCtrl.postAnnouncement);
