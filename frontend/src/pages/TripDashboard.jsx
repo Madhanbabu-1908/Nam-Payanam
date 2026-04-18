@@ -319,8 +319,8 @@ export default function TripDashboard() {
             </div>
           </button>
           <div className={`p-3 rounded-xl border text-center text-sm font-bold ${spotsLeft>0?'bg-emerald-50 border-emerald-200 text-emerald-700':'bg-amber-50 border-amber-200 text-amber-700'}`}>
-            {members.length}/{trip?.group_size} {lang==='ta'?'உறுப்பினர்கள்':'members'}
-            {spotsLeft>0?` · ${spotsLeft} ${lang==='ta'?'இடங்கள் உள்ளன':'open slots`':` · ${lang==='ta'?'குழு நிரம்பியது':'Group Full'}`}
+              {members.length}/{trip?.group_size} {lang==='ta'?'உறுப்பினர்கள்':'members'}
+              {spotsLeft > 0 ? ` · ${spotsLeft} ${lang === 'ta' ? 'இடங்கள் உள்ளன' : 'open slots'}` : ` · ${lang === 'ta' ? 'குழு நிரம்பியது' : 'Group Full'}`}
           </div>
         </div>
       </BottomSheet>
