@@ -263,9 +263,18 @@ export default function TripDashboard() {
           <BreaksTab trip={trip} breaks={breaks} expenses={expenses} members={members} session={session} lang={lang}/>
         )}
         {activeTab==='map' && (
-          <MapTab trip={trip} days={days} progress={progress} session={session} lang={lang}
-            onProgressUpdate={async(data)=>{ await tripAPI.updateProgress(trip.id, data); }}/>
-        )}
+         <div className="relative z-[1] overflow-hidden">
+         {/* 🔑 Low z-index wrapper + clip Leaflet overflow */}
+         <MapTab 
+         trip={trip} 
+         days={days} 
+         progress={progress} 
+         session={session} 
+         lang={lang}
+         onProgressUpdate={async(data)=>{ await tripAPI.updateProgress(trip.id, data); }}
+         />
+         </div>
+         )}
         {activeTab==='ai' && <AIAssistant trip={trip} session={session} lang={lang}/>}
         {activeTab==='report' && (
           <div className="pb-16">
