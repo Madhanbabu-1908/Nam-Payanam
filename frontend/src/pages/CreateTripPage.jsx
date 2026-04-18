@@ -125,18 +125,59 @@ export default function CreateTripPage() {
     }
   }
 
-  // Go to Preferences step (Step 1)
+  
   async function goToPreferences() {
-    if (!form.organizerName || !form.startLocation || !form.endLocation || !form.startDate || !form.endDate || !form.title)
-      return toast.error('Please fill all required fields');
-    
-    if (new Date(form.endDate) < new Date(form.startDate)) 
-      return toast.error('End date must be after start date');
+  // 1. Robust Validation Helper
+  const isValidLocation = (loc) => loc && loc.label && loc.lat && loc.lng;
 
-    // For both AI and Manual, we go to Step 1 (Preferences)
-    setStep(1);
+  // 2. Check Required Fields
+  if (!form.organizerName.trim()) return toast.error('Please enter your name');
+  if (!form.title.trim()) return toast.error('Please enter a trip title');
+  
+  if (!isValidLocation(form.startLocation)) 
+    return toast.error('Please select a valid Starting Point from the search results');
+    
+  if (!isValidLocation(form.endLocation)) 
+    return toast.error('Please select a valid Destination from the search results');
+
+  if (!form.startDate) return toast.error('Please select a Start Date');
+  if (!form.endDate) return toast.error('Please select an End Date');
+
+  if (new Date(form.endDate) < new Date(form.startDate)) 
+    return toast.error('End date must be after start date');
+
+  // 3. Handle Manual vs AI Flow
+  if (planMode === 'manual') { 
+    setStep(2); // Skip preferences, go straight to Manual Plan builder
+    return; 
   }
 
+  // 4. AI Mode: Fetch Questions
+  setLoading(true);
+  try {
+    const days = Math.max(1, Math.round((new Date(form.endDate)-new Date(form.startDate))/86400000));
+    
+    // Optional: Pass travel mode if already selected, otherwise let AI decide or ask
+    const res = await tripAPI.getAIQuestions({ 
+      startLocation: form.startLocation.label, 
+      endLocation: form.endLocation.label, 
+      groupSize: form.groupSize, 
+      days,
+      stops: form.stops.map(s => s.label)
+    });
+    
+    setAiQuestions(res.questions || []);
+    setStep(1);
+  } catch (err) {
+    console.error(err);
+    toast.error('Failed to load AI suggestions. Please try again.');
+    // Fallback: Allow user to proceed with empty questions or stay on step 0
+    setAiQuestions([]);
+    setStep(1); 
+  } finally { 
+    setLoading(false); 
+  }
+  }
   // Generate AI Plans (only for AI mode)
   async function generatePlans() {
     setLoading(true);
