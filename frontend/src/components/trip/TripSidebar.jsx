@@ -36,9 +36,16 @@ export default function TripSidebar({
 
   return (
     <>
-      {isOpen && <div className="sidebar-overlay animate-fade-in " onClick={onClose}/>}
-      <div className={`sidebar-panel pt-safe transition-transform duration-300 ${isOpen?'translate-x-0':'-translate-x-full'}`}>
-
+      {isOpen && (
+     <div 
+     className="sidebar-overlay fixed inset-0 bg-black/40 backdrop-blur-sm z-[9999] animate-fade-in" 
+     onClick={onClose}
+      />
+     )}
+      <div 
+  className={`sidebar-panel fixed left-0 top-0 h-full w-80 bg-white shadow-2xl z-[10000] 
+    pt-safe transition-transform duration-300 ${isOpen?'translate-x-0':'-translate-x-full'}`}
+      >
         {/* Header */}
         <div className="bg-gradient-to-br from-indigo-700 to-indigo-900 px-5 pt-5 pb-6">
           <div className="flex items-center justify-between mb-4">
