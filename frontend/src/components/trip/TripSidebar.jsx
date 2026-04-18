@@ -36,7 +36,7 @@ export default function TripSidebar({
 
   return (
     <>
-      {isOpen && <div className="sidebar-overlay animate-fade-in z-1000" onClick={onClose}/>}
+      {isOpen && <div className="sidebar-overlay animate-fade-in z-[1000]" onClick={onClose}/>}
       <div className={`sidebar-panel pt-safe transition-transform duration-300 ${isOpen?'translate-x-0':'-translate-x-full'}`}>
 
         {/* Header */}
