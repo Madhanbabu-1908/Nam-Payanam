@@ -50,21 +50,39 @@ export default function MapTab({ trip, days, progress, session, onProgressUpdate
     })();
   }, [trip?.id]);
 
-  // Init Leaflet
-  useEffect(() => {
-    if (!mapRef.current || mapInst.current) return;
-    const L = window.L;
-    if (!L) return;
+  // Inside your Leaflet init useEffect:
+useEffect(() => {
+  if (!mapRef.current || mapInst.current) return;
+  const L = window.L;
+  if (!L) return;
 
-    const map = L.map(mapRef.current, { zoomControl:false, attributionControl:true });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution:'© OpenStreetMap', maxZoom:19
-    }).addTo(map);
-    L.control.zoom({ position:'bottomright' }).addTo(map);
-    mapInst.current = map;
-    setMapReady(true);
-    return () => { map.remove(); mapInst.current = null; };
-  }, []);
+  const map = L.map(mapRef.current, { 
+    zoomControl: false, 
+    attributionControl: true,
+    // Lower default pane z-indexes so sidebar can overlay
+    pane: 'customPane'
+  });
+
+  // Create custom pane with lower z-index
+  map.createPane('customTilePane');
+  map.getPane('customTilePane').style.zIndex = 100; // Lower than sidebar
+  
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap',
+    maxZoom: 19,
+    pane: 'customTilePane' // Use custom pane
+  }).addTo(map);
+
+  // Also lower marker/popup panes if needed
+  map.createPane('customMarkerPane');
+  map.getPane('customMarkerPane').style.zIndex = 150;
+
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
+  mapInst.current = map;
+  setMapReady(true);
+  
+  return () => { map.remove(); mapInst.current = null; };
+}, []);
 
   // Draw route and markers
   useEffect(() => {
