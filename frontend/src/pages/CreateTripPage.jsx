@@ -219,7 +219,7 @@ export default function CreateTripPage() {
               )}
 
               {/* Route result */}
-              {routeData && (
+              {routeData && (aiAnswers.travel_mode==="car" || aiAnswers.travel_mode==="bike" || (!aiAnswers.travel_mode)) && (
                 <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
                   <div className="flex items-center gap-2 mb-2"><span className="text-emerald-600 font-bold text-sm">✅ Route Calculated (OSRM)</span></div>
                   <div className="grid grid-cols-2 gap-2">
@@ -265,7 +265,7 @@ export default function CreateTripPage() {
             </div>
 
             {/* Fuel calculator */}
-            {routeData && (
+            {routeData && (aiAnswers.travel_mode==="car" || aiAnswers.travel_mode==="bike" || (!aiAnswers.travel_mode)) && (
               <div className="card p-4 space-y-3">
                 <h2 className="font-display font-bold text-slate-800">⛽ Fuel Estimator</h2>
                 <div className="grid grid-cols-2 gap-3">
@@ -333,7 +333,7 @@ export default function CreateTripPage() {
               </>
             ) : (
               <>
-                {routeData && (
+                {routeData && (aiAnswers.travel_mode==="car" || aiAnswers.travel_mode==="bike" || (!aiAnswers.travel_mode)) && (
                   <div className="card-indigo p-4 rounded-2xl">
                     <div className="flex items-center gap-2 mb-2"><span className="text-lg">🛣️</span><span className="font-bold text-white">Verified Route</span></div>
                     <div className="flex gap-4">
