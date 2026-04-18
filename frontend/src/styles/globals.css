@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700;800&family=Noto+Sans+Tamil:wght@400;500;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -15,7 +16,7 @@
   .card-indigo { @apply bg-dark-card text-white rounded-2xl shadow-indigo; }
   .card-glass  { @apply bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl; }
 
-  /* ── Buttons ───────────────────────────────────────────── */
+  /* ── Buttons ─────────────────────────────────────────────*/
   .btn-primary {
     @apply bg-saffron-gradient text-white font-display font-bold px-5 py-3.5 rounded-xl
            shadow-saffron transition-all duration-150 active:scale-95 active:shadow-none
@@ -30,14 +31,14 @@
            transition-all duration-150 active:scale-95 text-sm flex items-center justify-center gap-2;
   }
   .btn-danger {
-    @apply bg-red-50 hover:bg-red-100 text-red-600 font-semibold px-4 py-2.5 rounded-xl
-           border border-red-200 transition-all duration-150 active:scale-95 text-sm;
+    @apply bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2.5 rounded-xl
+           transition-all duration-150 active:scale-95 text-sm flex items-center justify-center gap-2;
   }
   .btn-icon {
     @apply w-10 h-10 flex items-center justify-center rounded-xl transition-all duration-150 active:scale-90;
   }
 
-  /* ── Inputs ────────────────────────────────────────────── */
+  /* ── Inputs ─────────────────────────────────────────────*/
   .input {
     @apply w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800
            placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent
@@ -45,7 +46,7 @@
   }
   .label { @apply text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block; }
 
-  /* ── Badges ────────────────────────────────────────────── */
+  /* ── Badges ─────────────────────────────────────────────*/
   .badge         { @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold; }
   .badge-saffron { @apply badge bg-saffron-100 text-saffron-700; }
   .badge-indigo  { @apply badge bg-indigo-100 text-indigo-700; }
@@ -53,8 +54,9 @@
   .badge-red     { @apply badge bg-red-100 text-red-600; }
   .badge-slate   { @apply badge bg-slate-100 text-slate-600; }
   .badge-gold    { @apply badge bg-amber-100 text-amber-700; }
+  .badge-tamil   { @apply badge bg-rose-100 text-rose-700 font-tamil; }
 
-  /* ── Bottom Sheet ──────────────────────────────────────── */
+  /* ── Bottom Sheet ────────────────────────────────────────*/
   .sheet-overlay  { @apply fixed inset-0 bg-black/50 backdrop-blur-sm z-40 animate-fade-in; }
   .sheet-content  {
     @apply fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl z-50
@@ -64,19 +66,26 @@
   .sheet-handle   { @apply w-12 h-1.5 bg-slate-200 rounded-full mx-auto mt-3 mb-2; }
   .sheet-header   { @apply flex items-center justify-between px-5 py-3 border-b border-slate-100; }
 
-  /* ── Tab bar ───────────────────────────────────────────── */
-  .tab-bar        { @apply flex border-b border-slate-100 bg-white; }
-  .tab-item       { @apply flex-1 py-3 flex flex-col items-center gap-0.5 transition-colors text-[11px] font-bold; }
-  .tab-active     { @apply text-saffron-500 border-b-2 border-saffron-500; }
-  .tab-inactive   { @apply text-slate-400; }
+  /* ── Sidebar ─────────────────────────────────────────────*/
+  .sidebar-overlay { @apply fixed inset-0 bg-black/40 backdrop-blur-sm z-40; }
+  .sidebar-panel {
+    @apply fixed top-0 left-0 bottom-0 w-72 bg-white z-50 flex flex-col overflow-hidden;
+    box-shadow: 4px 0 32px rgba(0,0,0,0.15);
+  }
 
-  /* ── Day tabs ──────────────────────────────────────────── */
+  /* ── Side nav items ──────────────────────────────────────*/
+  .nav-item { @apply flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-150 active:scale-95 text-sm font-semibold; }
+  .nav-item-active { @apply bg-indigo-50 text-indigo-700; }
+  .nav-item-idle   { @apply text-slate-600 hover:bg-slate-50; }
+  .nav-item-danger { @apply text-red-600 hover:bg-red-50; }
+
+  /* ── Day chips ───────────────────────────────────────────*/
   .day-chip         { @apply flex-shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-150 border; }
   .day-chip-active  { @apply bg-indigo-600 text-white border-indigo-600 shadow-indigo; }
   .day-chip-done    { @apply bg-emerald-100 text-emerald-700 border-emerald-200; }
   .day-chip-idle    { @apply bg-white text-slate-500 border-slate-200; }
 
-  /* ── Category colors ───────────────────────────────────── */
+  /* ── Category colors ─────────────────────────────────────*/
   .cat-food      { @apply bg-orange-100 text-orange-700; }
   .cat-transport { @apply bg-blue-100 text-blue-700; }
   .cat-stay      { @apply bg-purple-100 text-purple-700; }
@@ -86,36 +95,63 @@
   .cat-medical   { @apply bg-rose-100 text-rose-700; }
   .cat-other     { @apply bg-slate-100 text-slate-600; }
 
-  /* ── Safe areas ────────────────────────────────────────── */
+  /* ── Quick expense pill ──────────────────────────────────*/
+  .quick-cat { @apply flex flex-col items-center gap-1 px-3 py-2.5 rounded-xl border-2 text-xs font-bold transition-all; }
+  .quick-cat-active { @apply border-indigo-500 bg-indigo-50 text-indigo-700; }
+  .quick-cat-idle   { @apply border-slate-200 bg-white text-slate-500; }
+
+  /* ── AI action cards ─────────────────────────────────────*/
+  .ai-action { @apply flex items-center gap-3 p-3.5 bg-white rounded-2xl border border-slate-100 shadow-sm active:scale-95 transition-all; }
+
+  /* ── Safe areas ──────────────────────────────────────────*/
   .pb-safe { padding-bottom: max(env(safe-area-inset-bottom, 16px), 16px); }
   .pt-safe { padding-top: env(safe-area-inset-top, 0px); }
 
-  /* ── Skeleton ──────────────────────────────────────────── */
+  /* ── Skeleton ────────────────────────────────────────────*/
   .skeleton {
     @apply rounded-xl animate-shimmer;
     background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
     background-size: 200% 100%;
   }
 
-  /* ── Live dot ──────────────────────────────────────────── */
+  /* ── Live dot ────────────────────────────────────────────*/
   .live-dot { @apply w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse-dot; }
-  .live-dot-red { @apply w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse-dot; }
 
-  /* ── Status pills ──────────────────────────────────────── */
+  /* ── Status pills ────────────────────────────────────────*/
   .status-planning  { @apply badge bg-amber-100 text-amber-700; }
   .status-active    { @apply badge bg-emerald-100 text-emerald-700; }
   .status-completed { @apply badge bg-indigo-100 text-indigo-700; }
+
+  /* ── Offline banner ──────────────────────────────────────*/
+  .offline-bar { @apply fixed top-0 left-0 right-0 z-[60] bg-amber-500 text-white text-xs font-bold text-center py-1.5; }
 }
 
-/* Leaflet overrides */
+/* Scrollbar */
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-thumb { background: #c7d2fe; border-radius: 999px; }
+
+/* Tamil font */
+.font-tamil { font-family: 'Noto Sans Tamil', sans-serif; }
+
+/* Leaflet */
 .leaflet-container { font-family: 'DM Sans', sans-serif !important; border-radius: 16px; }
 .leaflet-popup-content-wrapper { border-radius: 14px !important; box-shadow: 0 8px 32px rgba(0,0,0,0.15) !important; }
 .leaflet-control-zoom { border: none !important; border-radius: 12px !important; overflow: hidden; }
 .leaflet-control-zoom a { border: none !important; background: white !important; color: #4338ca !important; font-weight: bold; }
 
-/* Custom scrollbar */
-::-webkit-scrollbar { width: 3px; height: 3px; }
-::-webkit-scrollbar-thumb { background: #c7d2fe; border-radius: 999px; }
+@keyframes fade-in   { from { opacity: 0 } to { opacity: 1 } }
+@keyframes slide-up  { from { transform: translateY(24px); opacity:0 } to { transform: translateY(0); opacity:1 } }
+@keyframes slide-in  { from { transform: translateX(-100%) } to { transform: translateX(0) } }
+@keyframes shimmer   { 0% { background-position:-200% 0 } 100% { background-position:200% 0 } }
+@keyframes pulse-dot { 0%,100% { opacity:1 } 50% { opacity:.4 } }
+@keyframes bounce-in { 0% { transform:scale(.8);opacity:0 } 60% { transform:scale(1.05) } 100% { transform:scale(1);opacity:1 } }
 
-/* Smooth page load */
-.page-enter { animation: fadeIn 0.25s ease-out; }
+.animate-fade-in   { animation: fade-in 0.25s ease-out; }
+.animate-slide-up  { animation: slide-up 0.3s cubic-bezier(.34,1.56,.64,1); }
+.animate-slide-in  { animation: slide-in 0.3s cubic-bezier(.34,1.56,.64,1); }
+.animate-shimmer   { animation: shimmer 1.4s infinite; }
+.animate-pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
+.animate-bounce-in { animation: bounce-in 0.4s ease-out; }
+
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
