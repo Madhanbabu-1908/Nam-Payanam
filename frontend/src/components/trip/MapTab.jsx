@@ -250,7 +250,12 @@ useEffect(() => {
     <div className="flex flex-col h-full animate-fade-in">
       {/* Map container */}
       <div className="relative" style={{ height:'52vh', minHeight:260 }}>
-        <div ref={mapRef} className="w-full h-full rounded-none"/>
+        {/* Map container - explicitly low z-index */}
+      <div 
+       ref={mapRef} 
+       className="w-full h-full rounded-none"
+       style={{ zIndex: 1, position: 'relative' }}  // 🔑 Critical!
+      />
 
         {/* RedBus-style top overlay: route name */}
         <div className="absolute top-3 left-3 right-3 z-[400] pointer-events-none">
