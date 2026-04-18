@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // 👈 FIXED: Added useEffect import
 import { breakAPI, expenseAPI } from '../../utils/api';
 import toast from 'react-hot-toast';
 import { BottomSheet, MemberAvatar, EmptyState, Spinner, formatCurrency, formatTime, formatDuration, BreakTypeIcon, CategoryIcon } from '../ui/index.jsx';
@@ -22,17 +22,32 @@ export default function BreaksTab({ trip, breaks, expenses, members, session }) 
 
   // Get unique day numbers from breaks for filtering
   const dayNums = [...new Set(breaks.map(b => b.day_number))].sort((a,b) => a-b);
-
+  
   // Filter breaks by selected day
   const filtered = filterDay==='all' ? breaks : breaks.filter(b => b.day_number===parseInt(filterDay));
-
+  
   // Calculate total break time
   const totalBreakTime = breaks.reduce((s,b) => s+(b.duration_minutes||0), 0);
 
+  // 👇 MOVED UP: Define delete handler before rendering
+  async function handleDeleteBreak(breakId) {
+    if (!window.confirm('Are you sure you want to delete this break?')) return;
+    
+    try {
+      await breakAPI.delete(breakId); 
+      toast.success('Break deleted!');
+      // Note: Ideally, parent component should re-fetch breaks here. 
+      // If parent doesn't auto-refresh, you might need to pass a refresh callback prop.
+      window.location.reload(); // Temporary fallback to ensure UI updates
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to delete break.');
+    }
+  }
+
   return (
     <div className="flex flex-col pb-28 animate-fade-in">
-      {/* Summary Card */}
-      <div className="mx-4 mt-4 card-indigo rounded-2xl p-4">
+      {/* Summary Card */}      <div className="mx-4 mt-4 card-indigo rounded-2xl p-4">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-white/60 text-xs font-bold uppercase">Total Breaks</p>
@@ -47,7 +62,8 @@ export default function BreaksTab({ trip, breaks, expenses, members, session }) 
         <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
           {BREAK_TYPES.filter(t => breaks.some(b=>b.break_type===t.value)).map(t => (
             <div key={t.value} className="flex-shrink-0 bg-white/15 rounded-xl px-2.5 py-1.5 text-center">
-              <div className="text-base">{t.icon}</div>              <div className="text-white text-[10px] font-bold mt-0.5">{breaks.filter(b=>b.break_type===t.value).length}</div>
+              <div className="text-base">{t.icon}</div>              
+              <div className="text-white text-[10px] font-bold mt-0.5">{breaks.filter(b=>b.break_type===t.value).length}</div>
             </div>
           ))}
         </div>
@@ -69,19 +85,18 @@ export default function BreaksTab({ trip, breaks, expenses, members, session }) 
           <EmptyState icon="☕" title="No breaks logged" description="Any member can log a food, fuel or rest stop here"/>
         ) : (
           filtered.map(b => (
-            <BreakCard 
-              key={b.id} 
+            <BreakCard
+              key={b.id}
               breakEntry={b}
               expenses={expenses.filter(e => e.break_id===b.id)}
-              session={session} 
-              trip={trip} 
+              session={session}
+              trip={trip}
               members={members}
               onEdit={() => setEditBreak(b)}
-              onDelete={(id) => handleDeleteBreak(id)} // 👈 NEW: Pass delete handler
+              onDelete={handleDeleteBreak} // 👈 Pass the handler defined above
             />
           ))
-        )}
-      </div>
+        )}      </div>
 
       {/* FAB */}
       <button onClick={() => setShowAdd(true)}
@@ -90,27 +105,17 @@ export default function BreaksTab({ trip, breaks, expenses, members, session }) 
       </button>
 
       {/* Break Sheet - Now passes 'days' prop for dynamic day selection */}
-      <BreakSheet 
-        isOpen={showAdd||!!editBreak} 
+      <BreakSheet
+        isOpen={showAdd || !!editBreak}
         onClose={() => { setShowAdd(false); setEditBreak(null); }}
-        trip={trip} 
-        members={members} 
-        session={session} 
-        editData={editBreak}        days={trip?.itinerary || []} // 👈 PASS DAYS FROM TRIP ITINERARY
+        trip={trip}
+        members={members}
+        session={session}
+        editData={editBreak}
+        days={trip?.itinerary || []} // 👈 PASS DAYS FROM TRIP ITINERARY
       />
     </div>
   );
-}
-
-// Helper function to delete break (can be moved to parent if needed)
-async function handleDeleteBreak(breakId) {
-  try {
-    await breakAPI.delete(breakId); // You MUST implement this in api.js
-    toast.success('Break deleted!');
-    window.location.reload(); // Temporary refresh — better to use callback/state lift
-  } catch {
-    toast.error('Failed to delete break.');
-  }
 }
 
 function BreakCard({ breakEntry: b, expenses, session, trip, members, onEdit, onDelete }) {
@@ -140,19 +145,15 @@ function BreakCard({ breakEntry: b, expenses, session, trip, members, onEdit, on
           <div className="flex items-start justify-between">
             <h4 className="font-display font-bold text-slate-800 text-sm">{b.stop_name}</h4>
             {canEdit && (
-              <div className="flex gap-2">
-                {/* Edit Button */}
+              <div className="flex gap-2">                {/* Edit Button */}
                 <button onClick={onEdit} className="btn-icon bg-slate-100 w-8 h-8 flex-shrink-0">
                   <svg className="w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                  </svg>                </button>
+                  </svg>                
+                </button>
                 {/* DELETE BUTTON - BUG FIX #1 */}
-                <button 
-                  onClick={() => {
-                    if (window.confirm('Delete this break?')) {
-                      onDelete(b.id);
-                    }
-                  }} 
+                <button
+                  onClick={() => onDelete(b.id)}
                   className="btn-icon bg-red-50 hover:bg-red-100 w-8 h-8 flex-shrink-0"
                 >
                   <svg className="w-3.5 h-3.5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -193,8 +194,8 @@ function BreakCard({ breakEntry: b, expenses, session, trip, members, onEdit, on
       {/* Checkout button */}
       {!b.checkout_time && canEdit && (
         <button onClick={checkout} disabled={checkingOut}
-          className="w-full bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold py-2.5 rounded-xl text-sm active:bg-emerald-100 transition-colors flex items-center justify-center gap-2">
-          {checkingOut ? <Spinner size="sm" color="indigo"/> : '✅'} Check Out Now        </button>
+          className="w-full bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold py-2.5 rounded-xl text-sm active:bg-emerald-100 transition-colors flex items-center justify-center gap-2">          {checkingOut ? <Spinner size="sm" color="indigo"/> : '✅'} Check Out Now        
+        </button>
       )}
 
       {/* Expenses at this break */}
@@ -222,29 +223,28 @@ function BreakCard({ breakEntry: b, expenses, session, trip, members, onEdit, on
 }
 
 function BreakSheet({ isOpen, onClose, trip, members, session, editData, days = [] }) { // 👈 ACCEPT DAYS PROP
-  const [form, setForm] = useState({ 
-    stopName:'', 
-    breakType:'rest', 
-    customType:'', 
-    description:'', 
-    checkinTime:'', 
-    checkoutTime:'', 
-    dayNumber: days?.[0]?.day_number || 0 // 👈 DEFAULT TO FIRST DAY OF TRIP
+  const [form, setForm] = useState({
+    stopName:'',
+    breakType:'rest',
+    customType:'',
+    description:'',
+    checkinTime:'',
+    checkoutTime:'',
+    dayNumber: 0 
   });
   const [saving, setSaving] = useState(false);
-
   const upd = (k,v) => setForm(p => ({...p,[k]:v}));
 
   // Reset form when modal opens/closes
   useEffect(() => {
     if (!isOpen) {
-      setForm({ 
-        stopName:'', 
-        breakType:'rest', 
-        customType:'', 
-        description:'', 
-        checkinTime:'',         checkoutTime:'', 
-        dayNumber: days?.[0]?.day_number || 0 
+      setForm({
+        stopName:'',
+        breakType:'rest',
+        customType:'',
+        description:'',
+        checkinTime:'',                 checkoutTime:'',
+        dayNumber: days?.[0]?.day_number || 0
       });
     } else if (editData) {
       setForm({
@@ -263,35 +263,42 @@ function BreakSheet({ isOpen, onClose, trip, members, session, editData, days = 
 
   async function save() {
     if (!form.stopName.trim()) return toast.error('Stop name required');
+    
+    // Frontend Validation for Day Number
+    const maxDay = days?.length > 0 ? Math.max(...days.map(d => d.day_number)) : 0;
+    if (form.dayNumber > maxDay && form.dayNumber !== 0) {
+       return toast.error(`Invalid day. Max allowed: Day ${maxDay}`);
+    }
+
     setSaving(true);
     try {
       const payload = {
-        tripId: trip.id, 
-        dayNumber: form.dayNumber, 
+        tripId: trip.id,
+        dayNumber: form.dayNumber,
         addedByNickname: session?.nickname,
-        stopName: form.stopName.trim(), 
+        stopName: form.stopName.trim(),
         breakType: form.breakType,
-        customType: form.customType, 
+        customType: form.customType,
         description: form.description,
         checkinTime: form.checkinTime || new Date().toISOString(),
         checkoutTime: form.checkoutTime || null,
       };
-      if (editData) { 
-        await breakAPI.update(editData.id, payload); 
-        toast.success('Break updated!'); 
-      } else { 
-        await breakAPI.add(payload); 
-        toast.success('Break logged! ☕'); 
+      if (editData) {
+        await breakAPI.update(editData.id, payload);
+        toast.success('Break updated!');
+      } else {
+        await breakAPI.add(payload);
+        toast.success('Break logged! ☕');
       }
       onClose();
-    } catch (err) { 
-      toast.error(err.message); 
-    } finally { 
-      setSaving(false); 
+    } catch (err) {
+      toast.error(err.message);    } finally {
+      setSaving(false);
     }
   }
 
   if (!isOpen) return null;
+
   return (
     <BottomSheet isOpen={isOpen} onClose={onClose} title={editData ? 'Edit Break' : 'Log a Break'}>
       <div className="space-y-4 pb-4">
@@ -299,7 +306,6 @@ function BreakSheet({ isOpen, onClose, trip, members, session, editData, days = 
           <label className="label">Stop Name *</label>
           <input className="input" placeholder="e.g. Dhaba near Krishnagiri" value={form.stopName} onChange={e=>upd('stopName',e.target.value)}/>
         </div>
-
         <div>
           <label className="label">Break Type</label>
           <div className="grid grid-cols-3 gap-2">
@@ -312,14 +318,13 @@ function BreakSheet({ isOpen, onClose, trip, members, session, editData, days = 
             ))}
           </div>
         </div>
-
         {form.breakType==='other' && (
           <div>
             <label className="label">Custom Type</label>
             <input className="input" placeholder="Describe the stop type..." value={form.customType} onChange={e=>upd('customType',e.target.value)}/>
           </div>
         )}
-
+        
         {/* DYNAMIC DAY SELECTION - BUG FIX #2 */}
         <div>
           <label className="label">Day</label>
@@ -336,22 +341,20 @@ function BreakSheet({ isOpen, onClose, trip, members, session, editData, days = 
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="label">Check-in Time</label>
-            <input type="datetime-local" className="input text-sm" value={form.checkinTime} onChange={e=>upd('checkinTime',e.target.value)}/>
-          </div>
+            <input type="datetime-local" className="input text-sm" value={form.checkinTime} onChange={e=>upd('checkinTime',e.target.value)}/>          </div>
           <div>
             <label className="label">Check-out Time</label>
             <input type="datetime-local" className="input text-sm" value={form.checkoutTime} onChange={e=>upd('checkoutTime',e.target.value)}/>
-          </div>        </div>
-
+          </div>        
+        </div>
         <div>
           <label className="label">Description (optional)</label>
           <textarea className="input resize-none text-sm" rows={2} placeholder="Notes about this stop..." value={form.description} onChange={e=>upd('description',e.target.value)}/>
         </div>
-
         <button onClick={save} disabled={saving} className="btn-primary w-full py-4">
           {saving ? <Spinner size="sm" color="white"/> : '☕'} {saving?'Saving...':editData?'Update Break':'Log Break'}
         </button>
       </div>
     </BottomSheet>
   );
-        }
+}
