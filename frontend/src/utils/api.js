@@ -60,3 +60,24 @@ export const trackingAPI = {
   deleteToken: (tokenId, organizerId) => api.delete(`/tracking/tokens/${tokenId}`, { data: { organizerId } }),
   getByToken:  (token) => api.get(`/track/${token}`),
 };
+
+export const authAPI = {
+  register:   (data) => api.post('/auth/register', data),
+  login:      (data) => api.post('/auth/login', data),
+  me:         (accountId) => api.get(`/auth/me/${accountId}`),
+  changePin:  (data) => api.patch('/auth/change-pin', data),
+};
+
+export const checkinAPI = {
+  create:      (data) => api.post('/checkins', data),
+  getAll:      (tripId) => api.get(`/checkins/${tripId}`),
+  acknowledge: (id) => api.patch(`/checkins/${id}/acknowledge`, {}),
+  markPickup:  (id) => api.patch(`/checkins/${id}/pickup`, {}),
+};
+
+export const trackingAPI = {
+  push:        (data) => api.post('/tracking/location', data),
+  getPath:     (tripId) => api.get(`/tracking/${tripId}/path`),
+  createToken: (data) => api.post('/tracking/tokens', data),
+  getByToken:  (token) => api.get(`/track/${token}`),
+};
