@@ -1,5 +1,4 @@
 const crypto = require('crypto');
-const { v4: uuidv4 } = require('uuid');
 const supabase = require('../db/supabase');
 
 function hashPin(pin) {
@@ -31,7 +30,7 @@ async function register(req, res) {
       return res.status(400).json({ error: 'User ID already registered. Please login.' });
 
     // Insert new account
-    const {  account, error } = await supabase
+    const { data: account, error } = await supabase
       .from('organiser_accounts')
       .insert({
         user_id: normalizedUserId,
@@ -47,8 +46,8 @@ async function register(req, res) {
       account: { 
         id: account.id, 
         userId: account.user_id, 
-        name: account.name       }, 
-      token: `org_${account.id}` 
+        name: account.name 
+      },       token: `org_${account.id}` 
     });
 
   } catch (err) {
@@ -87,7 +86,7 @@ async function login(req, res) {
       .eq('id', account.id);
 
     // Get this organiser's trips
-    const {  trips } = await supabase
+    const { data: trips } = await supabase
       .from('trips')
       .select('id, trip_code, title, start_location, end_location, start_date, end_date, status, group_size')
       .eq('organiser_account_id', account.id)
@@ -96,8 +95,8 @@ async function login(req, res) {
 
     res.json({ 
       account: { 
-        id: account.id,         userId: account.user_id, 
-        name: account.name 
+        id: account.id, 
+        userId: account.user_id,         name: account.name 
       }, 
       token: `org_${account.id}`, 
       trips: trips || [] 
@@ -123,7 +122,7 @@ async function getMe(req, res) {
     if (error || !account) 
       return res.status(404).json({ error: 'Account not found' });
 
-    const {  trips } = await supabase
+    const { data: trips } = await supabase
       .from('trips')
       .select('id, trip_code, title, start_location, end_location, start_date, end_date, status, group_size')
       .eq('organiser_account_id', account.id)
@@ -145,10 +144,10 @@ async function getMe(req, res) {
 }
 
 // PATCH /api/auth/change-pin
-async function changePin(req, res) {  try {
-    const { accountId, oldPin, newPin } = req.body;
+async function changePin(req, res) {
+  try {    const { accountId, oldPin, newPin } = req.body;
 
-    const {  account } = await supabase
+    const { data: account } = await supabase
       .from('organiser_accounts')
       .select('pin_hash')
       .eq('id', accountId)
