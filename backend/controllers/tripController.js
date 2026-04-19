@@ -101,11 +101,9 @@ async function createTrip(req, res) {
       exists = !!data;
     }
 
-    // FIX: Removed space in uuidv4()
     const organizerId = uuidv4();
 
-    // FIX: Removed spaces in column names
-    const { data: trip, error: tripError } = await supabase.from('trips').insert({
+    const {  trip, error: tripError } = await supabase.from('trips').insert({
       trip_code: tripCode, 
       title, 
       organizer_id: organizerId,
@@ -133,7 +131,6 @@ async function createTrip(req, res) {
 
     if (tripError) throw tripError;
 
-    // Add organizer as member
     const { data: member, error: memErr } = await supabase.from('trip_members').insert({
       trip_id: trip.id, 
       member_id: organizerId,
@@ -143,18 +140,16 @@ async function createTrip(req, res) {
     
     if (memErr) throw memErr;
 
-    // Link session → trip
     if (sessionId) {
-      await supabase.from('user_sessions').upsert({ session_id: sessionId, last_seen: new Date().toISOString() }, { onConflict: 'session_id' });      await supabase.from('session_trips').upsert({
+      await supabase.from('user_sessions').upsert({ session_id: sessionId, last_seen: new Date().toISOString() }, { onConflict: 'session_id' });
+      await supabase.from('session_trips').upsert({
         session_id: sessionId, 
         trip_id: trip.id, 
-        member_id: organizerId,
-        nickname: organizerName, 
+        member_id: organizerId,        nickname: organizerName, 
         is_organizer: true
       }, { onConflict: 'session_id,trip_id' });
     }
 
-    // Create trip days
     const days = planMode === 'manual' ? manualDays : selectedPlan?.days;
     if (days?.length > 0) {
       let weatherData = null;
@@ -175,7 +170,6 @@ async function createTrip(req, res) {
       await supabase.from('trip_days').insert(dayInserts);
     }
 
-    // Init progress
     await supabase.from('trip_progress').insert({ trip_id: trip.id, current_stop_index: 0 });
 
     res.json({ tripId: trip.id, tripCode, organizerId, memberId: member.id, trip });
@@ -194,13 +188,13 @@ async function getTripByCode(req, res) {
     if (error || !trip) return res.status(404).json({ error: 'Trip not found or deleted' });
     
     const [{ data: members }, { data: days }, { data: progress }] = await Promise.all([
-      supabase.from('trip_members').select('*').eq('trip_id', trip.id).order('joined_at'),      supabase.from('trip_days').select('*').eq('trip_id', trip.id).order('day_number'),
+      supabase.from('trip_members').select('*').eq('trip_id', trip.id).order('joined_at'),
+      supabase.from('trip_days').select('*').eq('trip_id', trip.id).order('day_number'),
       supabase.from('trip_progress').select('*').eq('trip_id', trip.id).single(),
     ]);
 
     res.json({ trip, members: members||[], days: days||[], progress });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to get trip' });
+  } catch (err) {    res.status(500).json({ error: 'Failed to get trip' });
   }
 }
 
@@ -243,13 +237,13 @@ async function joinTrip(req, res) {
     if (existing) return res.status(400).json({ error: 'Nickname already taken in this trip' });
 
     const { data: member, error } = await supabase.from('trip_members').insert({
-      trip_id: trip.id, nickname: nickname.trim(), is_organizer: false    }).select().single();
+      trip_id: trip.id, nickname: nickname.trim(), is_organizer: false
+    }).select().single();
     if (error) throw error;
 
     if (sessionId) {
       await supabase.from('user_sessions').upsert({ session_id: sessionId, last_seen: new Date().toISOString() }, { onConflict: 'session_id' });
-      await supabase.from('session_trips').upsert({
-        session_id: sessionId, trip_id: trip.id,
+      await supabase.from('session_trips').upsert({        session_id: sessionId, trip_id: trip.id,
         member_id: member.member_id, nickname: nickname.trim(), is_organizer: false
       }, { onConflict: 'session_id,trip_id' });
     }
@@ -292,13 +286,13 @@ async function removeMember(req, res) {
     const { tripId, memberId } = req.params;
     const { organizerId } = req.body;
     const { data: org } = await supabase.from('trip_members').select('is_organizer')
-      .eq('trip_id', tripId).eq('member_id', organizerId).single();      
+      .eq('trip_id', tripId).eq('member_id', organizerId).single();
+      
     if (!org?.is_organizer) return res.status(403).json({ error: 'Only organizer can remove members' });
     
     await supabase.from('trip_members').delete().eq('id', memberId).eq('trip_id', tripId).eq('is_organizer', false);
     res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch (err) {    res.status(500).json({ error: err.message });
   }
 }
 
@@ -341,13 +335,13 @@ async function updateProgress(req, res) {
     if (dayReached !== undefined)
       await supabase.from('trip_days').update({ is_reached: true }).eq('trip_id', tripId).eq('day_number', dayReached);
 
-    res.json({ success: true });  } catch (err) {
+    res.json({ success: true });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 }
 
-// POST /api/trips/:tripId/announcements
-async function postAnnouncement(req, res) {
+// POST /api/trips/:tripId/announcementsasync function postAnnouncement(req, res) {
   try {
     const { tripId } = req.params;
     const { message, type, postedBy } = req.body;
