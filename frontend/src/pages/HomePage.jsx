@@ -122,7 +122,13 @@ export default function HomePage() {
               </svg>
             </button>
 
-            <button onClick={() => setShowJoin(!showJoin)}
+            {/* Organiser Login */}
+        <button onClick={() => navigate('/organiser')}
+          className="w-full bg-white/10 border border-white/20 text-white/70 font-semibold py-3 rounded-2xl text-sm active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+          🔑 Organiser Login — access your trips
+        </button>
+
+        <button onClick={() => setShowJoin(!showJoin)}
               className="w-full bg-white/15 backdrop-blur-sm border border-white/30 text-white font-display font-bold py-4 rounded-2xl active:scale-[0.98] transition-all flex items-center gap-3 px-5">
               <div className="w-10 h-10 bg-white/15 rounded-xl flex items-center justify-center flex-shrink-0">
                 <span className="text-xl">🤝</span>

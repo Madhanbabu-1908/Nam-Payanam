@@ -113,6 +113,10 @@ export default function TripDashboard() {
         const r=await breakAPI.getAll(trip.id); setBreaks(r.breaks||[]);
       })
       .on('postgres_changes',{event:'UPDATE',schema:'public',table:'trips',filter:`id=eq.${trip.id}`},(p)=>{
+        if(p.new?.status==='active' && !session?.isOrganizer) {
+          toast('🚀 Trip has started! Check the map.', {icon:'🗺️', duration:6000});
+          setActiveTab('map');
+        }
         if(p.new?.status==='deleted'){ toast.error('🗑️ Trip deleted by organiser'); navigate('/'); }
       })
       .subscribe();
@@ -134,8 +138,17 @@ export default function TripDashboard() {
   async function handleStatus(status) {
     try {
       await tripAPI.updateStatus(trip.id, status, session?.memberId);
+      if (status === 'active') {
+        // Post announcement so all members get notified via realtime
+        await tripAPI.postAnnouncement(trip.id, {
+          message: `🚀 Trip started! ${trip?.title} is now live. Open the Map tab to track progress.`,
+          type: 'milestone', postedBy: session?.nickname
+        });
+        // Auto-switch to map tab
+        setActiveTab('map');
+      }
       await loadTrip();
-      toast.success(status==='active'?'🚀 Trip started!':'✅ Trip completed!');
+      toast.success(status==='active'?'🚀 Trip started! Auto-tracking enabled.':'✅ Trip completed!');
     } catch(err){ toast.error(err.message); }
   }
 

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTripStore } from '../store/tripStore';
 import { tripAPI } from '../utils/api';
 import { getSessionId } from '../utils/session';
+import { getOrgAccount } from './OrgLoginPage.jsx';
 import toast from 'react-hot-toast';
 import LocationSearch from '../components/location/LocationSearch.jsx';
 import { Spinner, SkeletonCard, formatCurrency, PageHeader } from '../components/ui/index.jsx';
