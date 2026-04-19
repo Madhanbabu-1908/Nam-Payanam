@@ -115,3 +115,71 @@ ALTER PUBLICATION supabase_realtime ADD TABLE tracking_tokens;
 CREATE INDEX idx_live_loc_trip ON live_locations(trip_id);
 CREATE INDEX idx_path_trip ON travel_path(trip_id, recorded_at);
 CREATE INDEX idx_token ON tracking_tokens(token);
+
+-- ── V6 ADDITIONS ─────────────────────────────────────────────
+
+-- Organiser accounts (simple PIN-based, no email needed)
+CREATE TABLE IF NOT EXISTS organiser_accounts (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  phone VARCHAR(20) UNIQUE NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  pin_hash VARCHAR(64) NOT NULL,       -- SHA-256 of 4-digit PIN
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  last_login TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE organiser_accounts ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "service_all_organiser" ON organiser_accounts FOR ALL USING (true);
+
+-- Link organiser account to trips
+ALTER TABLE trips ADD COLUMN IF NOT EXISTS organiser_account_id UUID REFERENCES organiser_accounts(id) ON DELETE SET NULL;
+ALTER TABLE trips ADD COLUMN IF NOT EXISTS stops_data JSONB DEFAULT '[]';
+
+-- Track path points for green completed line
+CREATE TABLE IF NOT EXISTS trip_path_points (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  trip_id UUID REFERENCES trips(id) ON DELETE CASCADE,
+  lat DECIMAL(10,7) NOT NULL,
+  lng DECIMAL(10,7) NOT NULL,
+  speed DECIMAL(6,2) DEFAULT 0,
+  recorded_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Member check-ins (mid-trip Rapido-style)
+CREATE TABLE IF NOT EXISTS member_checkins (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  trip_id UUID REFERENCES trips(id) ON DELETE CASCADE,
+  member_id UUID NOT NULL,
+  nickname VARCHAR(100) NOT NULL,
+  checkin_lat DECIMAL(10,7) NOT NULL,
+  checkin_lng DECIMAL(10,7) NOT NULL,
+  checkin_name VARCHAR(255),
+  status VARCHAR(20) DEFAULT 'waiting' CHECK (status IN ('waiting','acknowledged','picked_up')),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE trip_path_points ENABLE ROW LEVEL SECURITY;
+ALTER TABLE member_checkins ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "service_all_path" ON trip_path_points FOR ALL USING (true);
+CREATE POLICY "service_all_checkins" ON member_checkins FOR ALL USING (true);
+
+ALTER PUBLICATION supabase_realtime ADD TABLE trip_path_points;
+ALTER PUBLICATION supabase_realtime ADD TABLE member_checkins;
+
+CREATE INDEX IF NOT EXISTS idx_path_trip ON trip_path_points(trip_id, recorded_at);
+CREATE INDEX IF NOT EXISTS idx_checkins_trip ON member_checkins(trip_id);
+CREATE INDEX IF NOT EXISTS idx_org_phone ON organiser_accounts(phone);
+
+-- Tracking tokens for public share links
+CREATE TABLE IF NOT EXISTS tracking_tokens (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  trip_id UUID REFERENCES trips(id) ON DELETE CASCADE,
+  token VARCHAR(64) UNIQUE NOT NULL,
+  label VARCHAR(100) DEFAULT 'Public Tracker',
+  expires_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE tracking_tokens ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "service_all_tokens" ON tracking_tokens FOR ALL USING (true);
+CREATE INDEX IF NOT EXISTS idx_token_val ON tracking_tokens(token);
