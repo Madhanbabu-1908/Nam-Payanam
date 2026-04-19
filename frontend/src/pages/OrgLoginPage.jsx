@@ -50,7 +50,6 @@ export default function OrgLoginPage() {
       setOrgAccount({ 
         id: res.account.id, 
         userId: res.account.userId, 
-        // Optional: store name if backend returns it
         name: res.account.name || userId.trim() 
       });
 
@@ -96,8 +95,8 @@ export default function OrgLoginPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                        {/* USER ID FIELD - REPLACES PHONE & NAME */}
-            <div>
+            
+            {/* USER ID FIELD - REPLACES PHONE & NAME */}            <div>
               <label className="label">User ID *</label>
               <input 
                 className="input" 
@@ -145,8 +144,8 @@ export default function OrgLoginPage() {
 
             <p className="text-xs text-slate-400 text-center">
               {mode === 'login'
-                ? "Don't have an account? Switch to Register above."                : 'Your PIN lets you access your trips from any device.'}
-            </p>
+                ? "Don't have an account? Switch to Register above."
+                : 'Your PIN lets you access your trips from any device.'}            </p>
           </form>
         </div>
 
