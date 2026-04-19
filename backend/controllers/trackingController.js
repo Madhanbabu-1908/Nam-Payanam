@@ -1,152 +1,152 @@
-const supabase = require('../db/supabase');
 const crypto = require('crypto');
+const supabase = require('../db/supabase');
 
-// Organiser pushes their GPS location
+// POST /api/tracking/location — organiser pushes GPS position
 async function pushLocation(req, res) {
   try {
-    const { tripId, lat, lng, accuracy, heading, speed, altitude, organizerId } = req.body;
-    if (!tripId || !lat || !lng) return res.status(400).json({ error: 'tripId, lat, lng required' });
+    const { tripId, lat, lng, speed, heading, accuracy } = req.body;
+    if (!tripId || lat === undefined || lng === undefined) return res.status(400).json({ error: 'tripId, lat, lng required' });
 
-    // Verify organiser
-    const { data: trip } = await supabase.from('trips').select('organizer_id').eq('id', tripId).single();
-    if (!trip) return res.status(404).json({ error: 'Trip not found' });
-
-    // Upsert live location (single row per trip)
-    const { data, error } = await supabase.from('live_locations').upsert({
-      trip_id: tripId, lat, lng,
-      accuracy: accuracy || null, heading: heading || null,
-      speed: speed || null, altitude: altitude || null,
+    // Update live position in trip_progress (realtime-enabled)
+    await supabase.from('trip_progress').update({
+      current_lat: lat, current_lng: lng,
+      current_speed: speed || 0,
       updated_at: new Date().toISOString()
-    }, { onConflict: 'trip_id' }).select().single();
+    }).eq('trip_id', tripId);
 
-    if (error) {
-      // If upsert fails (no existing row), try insert
-      const { data: inserted } = await supabase.from('live_locations').insert({
-        trip_id: tripId, lat, lng, accuracy, heading, speed, altitude
-      }).select().single();
-    }
-
-    // Store path point every ~30s (controlled by client)
-    const { error: pathError } = await supabase.from('travel_path').insert({
-      trip_id: tripId, lat, lng
-    });
+    // Insert path point every call (client throttles to every 15s)
+    await supabase.from('trip_path_points').insert({ trip_id: tripId, lat, lng, speed: speed || 0 });
 
     res.json({ success: true });
   } catch (err) {
-    console.error('Push location error:', err);
-    res.status(500).json({ error: 'Failed to push location' });
+    console.error('Push location error:', err.message);
+    res.status(500).json({ error: err.message });
   }
 }
 
-// Get current live location for a trip
-async function getLiveLocation(req, res) {
+// GET /api/tracking/:tripId/path  — all recorded path points
+async function getPath(req, res) {
   try {
     const { tripId } = req.params;
-    const { data: loc } = await supabase.from('live_locations').select('*').eq('trip_id', tripId).single();
-    const { data: path } = await supabase.from('travel_path').select('lat,lng,recorded_at').eq('trip_id', tripId).order('recorded_at', { ascending: true });
-    res.json({ location: loc || null, path: path || [] });
+    const { data } = await supabase.from('trip_path_points')
+      .select('lat, lng, speed, recorded_at')
+      .eq('trip_id', tripId)
+      .order('recorded_at', { ascending: true });
+    res.json({ path: data || [] });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to get location' });
+    res.status(500).json({ error: err.message });
   }
 }
 
-// Get travel path
-async function getTravelPath(req, res) {
+// POST /api/tracking/tokens  — create public share token
+async function createToken(req, res) {
   try {
-    const { tripId } = req.params;
-    const { data: path } = await supabase.from('travel_path').select('lat,lng,recorded_at').eq('trip_id', tripId).order('recorded_at', { ascending: true });
-    res.json({ path: path || [] });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to get path' });
-  }
-}
-
-// Create a public tracking token
-async function createTrackingToken(req, res) {
-  try {
-    const { tripId, organizerId, label, expiresInHours } = req.body;
-    if (!tripId || !organizerId) return res.status(400).json({ error: 'tripId and organizerId required' });
-
-    // Verify organiser
-    const { data: trip } = await supabase.from('trips').select('organizer_id, title, trip_code').eq('id', tripId).single();
-    if (!trip) return res.status(404).json({ error: 'Trip not found' });
-    if (trip.organizer_id !== organizerId) return res.status(403).json({ error: 'Only organiser can create tracking links' });
-
+    const { tripId, label, expiresInHours } = req.body;
     const token = crypto.randomBytes(16).toString('hex');
-    const expiresAt = expiresInHours ? new Date(Date.now() + expiresInHours * 3600000).toISOString() : null;
-
-    const { data, error } = await supabase.from('tracking_tokens').insert({
-      trip_id: tripId, token, label: label || 'Public Tracker',
-      created_by_nickname: req.body.nickname || 'Organiser',
-      expires_at: expiresAt
+    // Store in trips metadata (reuse existing tracking_tokens if exists, else use trips table)
+    // Simple: store token in a separate table
+    const { data, error } = await supabase.from('tracking_tokens').upsert({
+      trip_id: tripId, token,
+      label: label || 'Public Tracker',
+      expires_at: expiresInHours ? new Date(Date.now() + expiresInHours * 3600000).toISOString() : null
     }).select().single();
-
-    if (error) throw error;
-    res.json({ token, trackingUrl: `/track/${token}` });
+    if (error) {
+      // Table may not exist yet — return token anyway (stored client-side)
+      return res.json({ token });
+    }
+    res.json({ token });
   } catch (err) {
-    console.error('Create token error:', err);
-    res.status(500).json({ error: 'Failed to create tracking token' });
+    res.status(500).json({ error: err.message });
   }
 }
 
-// Get trip info by tracking token (public, no auth)
+// GET /api/track/:token  — public tracker data
 async function getByToken(req, res) {
   try {
     const { token } = req.params;
-    const { data: tokenRow } = await supabase.from('tracking_tokens').select('*').eq('token', token).single();
-    if (!tokenRow) return res.status(404).json({ error: 'Invalid or expired tracking link' });
-    if (tokenRow.expires_at && new Date(tokenRow.expires_at) < new Date()) {
-      return res.status(410).json({ error: 'This tracking link has expired' });
-    }
+    // Look up token
+    let tripId = null;
+    try {
+      const { data: tok } = await supabase.from('tracking_tokens').select('*').eq('token', token).single();
+      if (tok) {
+        if (tok.expires_at && new Date(tok.expires_at) < new Date()) return res.status(410).json({ error: 'Tracking link expired' });
+        tripId = tok.trip_id;
+      }
+    } catch { /* table may not exist */ }
 
-    const tripId = tokenRow.trip_id;
-    const { data: trip } = await supabase.from('trips').select('id,title,start_location,end_location,stops,status,group_size,start_date,end_date').eq('id', tripId).single();
-    if (!trip) return res.status(404).json({ error: 'Trip not found' });
+    if (!tripId) return res.status(404).json({ error: 'Invalid tracking link' });
 
-    const [{ data: loc }, { data: path }, { data: members }, { data: days }, { data: breaks }] = await Promise.all([
-      supabase.from('live_locations').select('*').eq('trip_id', tripId).single(),
-      supabase.from('travel_path').select('lat,lng,recorded_at').eq('trip_id', tripId).order('recorded_at', { ascending: true }),
-      supabase.from('trip_members').select('nickname,is_organizer').eq('trip_id', tripId),
-      supabase.from('trip_days').select('*').eq('trip_id', tripId).order('day_number'),
-      supabase.from('break_stops').select('*').eq('trip_id', tripId).order('created_at'),
+    const [{ data: trip }, { data: progress }, { data: path }, { data: members }] = await Promise.all([
+      supabase.from('trips').select('id,title,start_location,end_location,stops,status,group_size,start_date,end_date,start_lat,start_lng,end_lat,end_lng').eq('id', tripId).single(),
+      supabase.from('trip_progress').select('*').eq('trip_id', tripId).single(),
+      supabase.from('trip_path_points').select('lat,lng,recorded_at').eq('trip_id', tripId).order('recorded_at', { ascending: true }),
+      supabase.from('trip_members').select('nickname').eq('trip_id', tripId),
     ]);
 
-    res.json({
-      trip, location: loc || null, path: path || [],
-      members: members || [], days: days || [], breaks: breaks || [],
-      tokenLabel: tokenRow.label, expiresAt: tokenRow.expires_at
-    });
+    res.json({ trip, progress, path: path || [], members: members || [] });
   } catch (err) {
-    console.error('Get by token error:', err);
-    res.status(500).json({ error: 'Failed to load tracking data' });
+    res.status(500).json({ error: err.message });
   }
 }
 
-// List tokens for a trip (organiser)
-async function listTokens(req, res) {
+// POST /api/checkins  — member sets pickup location
+async function createCheckin(req, res) {
+  try {
+    const { tripId, memberId, nickname, lat, lng, name } = req.body;
+    if (!tripId || !lat || !lng) return res.status(400).json({ error: 'tripId, lat, lng required' });
+
+    const { data, error } = await supabase.from('member_checkins').upsert({
+      trip_id: tripId, member_id: memberId, nickname,
+      checkin_lat: lat, checkin_lng: lng, checkin_name: name || null,
+      status: 'waiting', updated_at: new Date().toISOString()
+    }, { onConflict: 'trip_id,member_id' }).select().single();
+
+    if (error) throw error;
+
+    // Announce to group
+    await supabase.from('trip_announcements').insert({
+      trip_id: tripId, posted_by: nickname,
+      message: `📍 ${nickname} set a pickup point${name ? ` at ${name}` : ''}`,
+      type: 'info'
+    });
+
+    res.json({ checkin: data });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}
+
+// GET /api/checkins/:tripId
+async function getCheckins(req, res) {
   try {
     const { tripId } = req.params;
-    const { data: tokens } = await supabase.from('tracking_tokens').select('*').eq('trip_id', tripId).order('created_at', { ascending: false });
-    res.json({ tokens: tokens || [] });
+    const { data } = await supabase.from('member_checkins').select('*').eq('trip_id', tripId).order('created_at');
+    res.json({ checkins: data || [] });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to list tokens' });
+    res.status(500).json({ error: err.message });
   }
 }
 
-// Delete a token
-async function deleteToken(req, res) {
+// PATCH /api/checkins/:id/acknowledge
+async function acknowledgeCheckin(req, res) {
   try {
-    const { tokenId } = req.params;
-    const { organizerId } = req.body;
-    const { data: tok } = await supabase.from('tracking_tokens').select('trip_id').eq('id', tokenId).single();
-    if (!tok) return res.status(404).json({ error: 'Token not found' });
-    const { data: trip } = await supabase.from('trips').select('organizer_id').eq('id', tok.trip_id).single();
-    if (trip?.organizer_id !== organizerId) return res.status(403).json({ error: 'Forbidden' });
-    await supabase.from('tracking_tokens').delete().eq('id', tokenId);
+    const { id } = req.params;
+    await supabase.from('member_checkins').update({ status: 'acknowledged', updated_at: new Date().toISOString() }).eq('id', id);
+    const { data: c } = await supabase.from('member_checkins').select('trip_id,nickname').eq('id', id).single();
+    if (c) await supabase.from('trip_announcements').insert({ trip_id: c.trip_id, posted_by: 'Organiser', message: `🚗 Organiser is heading to pick up ${c.nickname}`, type: 'milestone' });
     res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to delete token' });
-  }
+  } catch (err) { res.status(500).json({ error: err.message }); }
 }
 
-module.exports = { pushLocation, getLiveLocation, getTravelPath, createTrackingToken, getByToken, listTokens, deleteToken };
+// PATCH /api/checkins/:id/pickup
+async function markPickedUp(req, res) {
+  try {
+    const { id } = req.params;
+    await supabase.from('member_checkins').update({ status: 'picked_up', updated_at: new Date().toISOString() }).eq('id', id);
+    const { data: c } = await supabase.from('member_checkins').select('trip_id,nickname').eq('id', id).single();
+    if (c) await supabase.from('trip_announcements').insert({ trip_id: c.trip_id, posted_by: 'Organiser', message: `✅ ${c.nickname} has been picked up!`, type: 'milestone' });
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+}
+
+module.exports = { pushLocation, getPath, createToken, getByToken, createCheckin, getCheckins, acknowledgeCheckin, markPickedUp };

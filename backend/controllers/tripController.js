@@ -85,7 +85,8 @@ async function createTrip(req, res) {
       title, organizerName, startLocation, startLat, startLng,
       endLocation, endLat, endLng, stops, startDate, endDate,
       groupSize, selectedPlan, planIndex, planMode, manualDays,
-      routeData, sessionId, fuelData, preferences
+      routeData, sessionId, fuelData, preferences,
+      stopsData, organiserAccountId
     } = req.body;
 
     if (!title || !organizerName || !startLocation || !endLocation)
@@ -106,11 +107,12 @@ async function createTrip(req, res) {
       organizer_name: organizerName,
       start_location: startLocation, start_lat: startLat, start_lng: startLng,
       end_location: endLocation, end_lat: endLat, end_lng: endLng,
-      stops: stops || [], route_data: routeData || null,
+      stops: stops || [], stops_data: stopsData || [], route_data: routeData || null,
       start_date: startDate, end_date: endDate, group_size: groupSize,
       ai_plan: selectedPlan || null, selected_plan_index: planIndex || 0,
       plan_mode: planMode || 'ai', fuel_data: fuelData || null,
       preferences: preferences || {}, status: 'planning',
+      organiser_account_id: organiserAccountId || null,
     }).select().single();
 
     if (tripError) throw tripError;
