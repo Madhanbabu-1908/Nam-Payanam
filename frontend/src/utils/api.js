@@ -5,6 +5,7 @@ const api = axios.create({
   timeout: 90000,
 });
 
+// Response interceptor to handle errors globally
 api.interceptors.response.use(
   r => r.data,
   err => Promise.reject(new Error(err.response?.data?.error || err.message || 'Network error'))
@@ -49,8 +50,6 @@ export const aiAPI = {
   insights: (tripId) => api.get(`/ai/insights/${tripId}`),
 };
 
-export default api;
-
 export const trackingAPI = {
   push:        (data) => api.post('/tracking/push', data),
   getLive:     (tripId) => api.get(`/tracking/${tripId}/live`),
@@ -75,9 +74,4 @@ export const checkinAPI = {
   markPickup:  (id) => api.patch(`/checkins/${id}/pickup`, {}),
 };
 
-export const trackingAPI = {
-  push:        (data) => api.post('/tracking/location', data),
-  getPath:     (tripId) => api.get(`/tracking/${tripId}/path`),
-  createToken: (data) => api.post('/tracking/tokens', data),
-  getByToken:  (token) => api.get(`/track/${token}`),
-};
+export default api;
