@@ -1,6 +1,7 @@
 const { v4: uuidv4 } = require('uuid');
 const supabase = require('../db/supabase');
 const { generateTripPlans, generateFollowUpQuestions } = require('../services/groqService');
+// Import searchSuggestions explicitly from routeService
 const { calculateRoute, searchSuggestions } = require('../services/routeService');
 const { getWeatherForLocation } = require('../services/weatherService');
 
@@ -46,8 +47,8 @@ async function getAIQuestions(req, res) {
     const questions = await generateFollowUpQuestions(req.body);
     res.json({ questions });
   } catch (err) {
-    res.status(500).json({ error: err.message });
-  }}
+    res.status(500).json({ error: err.message });  }
+}
 
 // POST /api/trips/ai-plans
 async function getAIPlans(req, res) {
@@ -95,8 +96,8 @@ async function createTrip(req, res) {
 
     let tripCode;
     let exists = true;
-    while (exists) {
-      tripCode = generateTripCode();      const { data } = await supabase.from('trips').select('id').eq('trip_code', tripCode).single();
+    while (exists) {      tripCode = generateTripCode();
+      const { data } = await supabase.from('trips').select('id').eq('trip_code', tripCode).single();
       exists = !!data;
     }
 
@@ -144,8 +145,8 @@ async function createTrip(req, res) {
 
     // Link session → trip
     if (sessionId) {
-      await supabase.from('user_sessions').upsert({ session_id: sessionId, last_seen: new Date().toISOString() }, { onConflict: 'session_id' });
-      await supabase.from('session_trips').upsert({        session_id: sessionId, 
+      await supabase.from('user_sessions').upsert({ session_id: sessionId, last_seen: new Date().toISOString() }, { onConflict: 'session_id' });      await supabase.from('session_trips').upsert({
+        session_id: sessionId, 
         trip_id: trip.id, 
         member_id: organizerId,
         nickname: organizerName, 
@@ -193,8 +194,8 @@ async function getTripByCode(req, res) {
     if (error || !trip) return res.status(404).json({ error: 'Trip not found or deleted' });
     
     const [{ data: members }, { data: days }, { data: progress }] = await Promise.all([
-      supabase.from('trip_members').select('*').eq('trip_id', trip.id).order('joined_at'),
-      supabase.from('trip_days').select('*').eq('trip_id', trip.id).order('day_number'),      supabase.from('trip_progress').select('*').eq('trip_id', trip.id).single(),
+      supabase.from('trip_members').select('*').eq('trip_id', trip.id).order('joined_at'),      supabase.from('trip_days').select('*').eq('trip_id', trip.id).order('day_number'),
+      supabase.from('trip_progress').select('*').eq('trip_id', trip.id).single(),
     ]);
 
     res.json({ trip, members: members||[], days: days||[], progress });
@@ -242,8 +243,8 @@ async function joinTrip(req, res) {
     if (existing) return res.status(400).json({ error: 'Nickname already taken in this trip' });
 
     const { data: member, error } = await supabase.from('trip_members').insert({
-      trip_id: trip.id, nickname: nickname.trim(), is_organizer: false
-    }).select().single();    if (error) throw error;
+      trip_id: trip.id, nickname: nickname.trim(), is_organizer: false    }).select().single();
+    if (error) throw error;
 
     if (sessionId) {
       await supabase.from('user_sessions').upsert({ session_id: sessionId, last_seen: new Date().toISOString() }, { onConflict: 'session_id' });
@@ -291,8 +292,8 @@ async function removeMember(req, res) {
     const { tripId, memberId } = req.params;
     const { organizerId } = req.body;
     const { data: org } = await supabase.from('trip_members').select('is_organizer')
-      .eq('trip_id', tripId).eq('member_id', organizerId).single();
-          if (!org?.is_organizer) return res.status(403).json({ error: 'Only organizer can remove members' });
+      .eq('trip_id', tripId).eq('member_id', organizerId).single();      
+    if (!org?.is_organizer) return res.status(403).json({ error: 'Only organizer can remove members' });
     
     await supabase.from('trip_members').delete().eq('id', memberId).eq('trip_id', tripId).eq('is_organizer', false);
     res.json({ success: true });
@@ -340,8 +341,8 @@ async function updateProgress(req, res) {
     if (dayReached !== undefined)
       await supabase.from('trip_days').update({ is_reached: true }).eq('trip_id', tripId).eq('day_number', dayReached);
 
-    res.json({ success: true });
-  } catch (err) {    res.status(500).json({ error: err.message });
+    res.json({ success: true });  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 }
 
