@@ -38,7 +38,8 @@ router.patch('/expenses/:expenseId',        expCtrl.updateExpense);
 router.delete('/expenses/:expenseId',       expCtrl.deleteExpense);
 
 // ── BREAKS ────────────────────────────────────────────────────
-router.get('/breaks/:tripId',    breakCtrl.getBreaks);
+// FIX: Changed getBreaks to getTripBreaks to match controller export
+router.get('/breaks/:tripId',    breakCtrl.getTripBreaks); 
 router.post('/breaks',           breakCtrl.addBreak);
 router.patch('/breaks/:breakId', breakCtrl.updateBreak);
 router.delete('/breaks/:breakId',breakCtrl.deleteBreak);
