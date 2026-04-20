@@ -47,7 +47,8 @@ async function getAIQuestions(req, res) {
   }
 }
 
-// POST /api/trips/ai-plansasync function getAIPlans(req, res) {
+// POST /api/trips/ai-plans
+async function getAIPlans(req, res) {
   try {
     const { startLocation, endLocation, stops, startDate, endDate,
       groupSize, budget, preferences, travelMode, accommodation,
@@ -111,15 +112,15 @@ async function createTrip(req, res) {
       end_lat: endLat, 
       end_lng: endLng,
       stops: stops || [], 
-      stops_ stopsData || [], 
-      route_ routeData || null,
+      stops_data: stopsData || [], 
+      route_data: routeData || null,
       start_date: startDate, 
       end_date: endDate, 
       group_size: groupSize,
       ai_plan: selectedPlan || null, 
       selected_plan_index: planIndex || 0,
       plan_mode: planMode || 'ai', 
-      fuel_ fuelData || null,
+      fuel_data: fuelData || null,
       preferences: preferences || {}, 
       status: 'planning',
       organiser_account_id: organiserAccountId || null,
@@ -161,7 +162,7 @@ async function createTrip(req, res) {
         stops: day.stops || [],
         notes: day.notes || null,
         is_reached: false,
-        weather_ weatherData?.find(w => w.date === day.date) || null,
+        weather_data: weatherData?.find(w => w.date === day.date) || null,
       }));
       await supabase.from('trip_days').insert(dayInserts);
     }
