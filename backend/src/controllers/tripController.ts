@@ -1,4 +1,4 @@
-qimport { Response, NextFunction } from 'express';
+import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { tripService } from '../services/tripService';
 import { aiService } from '../services/aiService';
@@ -8,7 +8,12 @@ export const tripController = {
   createTrip: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { name, destination, start_date, end_date, budget, mode, interests, start_location } = req.body;
-      const userId = req.user!.id;
+      
+      if (!req.user) {
+        return res.status(401).json({ success: false, error: 'User not authenticated' });
+      }
+      
+      const userId = req.user.id;
 
       const newTrip = await tripService.createTrip({
         organizer_id: userId,
@@ -38,7 +43,7 @@ export const tripController = {
           startLocation: start_location
         });
 
-        const itemsToInsert = aiItems.map(item => ({ ...item, trip_id: newTrip.id }));
+        const itemsToInsert = aiItems.map((item: any) => ({ ...item, trip_id: newTrip.id }));
         
         if (itemsToInsert.length > 0) {
           await supabaseAdmin.from('itinerary_items').insert(itemsToInsert);
@@ -51,7 +56,6 @@ export const tripController = {
     }
   },
 
-  // ✅ Added missing function to fix TS2339 error
   updateTrip: async (req: AuthRequest, res: Response, next: NextFunction) => {
     res.json({ 
       success: true, 
