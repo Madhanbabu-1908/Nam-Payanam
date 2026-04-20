@@ -1,8 +1,7 @@
 import { supabaseAdmin } from '../config/db';
-import { Trip, UserRole } from '../../shared/types'; // Assuming you copied types or defined them locally
+import { Trip } from '../types'; // ✅ Fixed import
 
 export const tripService = {
-  // Create a new trip
   async createTrip(data: Omit<Trip, 'id' | 'created_at'>) {
     const { data: trip, error } = await supabaseAdmin
       .from('trips')
@@ -14,11 +13,10 @@ export const tripService = {
     return trip;
   },
 
-  // Get trip by ID
   async getTripById(tripId: string) {
     const { data, error } = await supabaseAdmin
       .from('trips')
-      .select('*, members:user_id') // Join members to check roles later if needed
+      .select('*')
       .eq('id', tripId)
       .single();
 
@@ -26,7 +24,6 @@ export const tripService = {
     return data;
   },
 
-  // Verify if user is the organizer
   async verifyOrganizer(tripId: string, userId: string): Promise<boolean> {
     const { data, error } = await supabaseAdmin
       .from('trips')
@@ -38,13 +35,7 @@ export const tripService = {
     return data.organizer_id === userId;
   },
 
-  // ✅ CRITICAL: Delete Trip with Cascade
   async deleteTrip(tripId: string) {
-    // Note: If your DB has ON DELETE CASCADE set up, this single call removes:
-    // - Itinerary Items
-    // - Expenses
-    // - Expense Splits
-    // - Trip Members
     const { error } = await supabaseAdmin
       .from('trips')
       .delete()
