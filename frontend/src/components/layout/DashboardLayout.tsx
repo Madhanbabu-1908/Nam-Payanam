@@ -1,5 +1,4 @@
-import React from 'react';
-import { Outlet, useNavigate, useParams } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 
 export const DashboardLayout: React.FC = () => {
@@ -14,7 +13,7 @@ export const DashboardLayout: React.FC = () => {
         <h1 className="text-xl font-bold text-gray-900">Trip Dashboard</h1>
       </header>
       <main className="p-6">
-        <Outlet /> {/* Renders child routes like Itinerary, Expenses */}
+        <Outlet />
       </main>
     </div>
   );
