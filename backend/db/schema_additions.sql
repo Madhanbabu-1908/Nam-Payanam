@@ -121,9 +121,9 @@ CREATE INDEX idx_token ON tracking_tokens(token);
 -- Organiser accounts (simple PIN-based, no email needed)
 CREATE TABLE IF NOT EXISTS organiser_accounts (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  phone VARCHAR(20) UNIQUE NOT NULL,
-  name VARCHAR(100) NOT NULL,
-  pin_hash VARCHAR(64) NOT NULL,       -- SHA-256 of 4-digit PIN
+  user_id VARCHAR(100) UNIQUE NOT NULL,
+  name VARCHAR(100) NOT NULL DEFAULT '',
+  pin_hash VARCHAR(64) NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   last_login TIMESTAMPTZ DEFAULT NOW()
 );
@@ -169,7 +169,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE member_checkins;
 
 CREATE INDEX IF NOT EXISTS idx_path_trip ON trip_path_points(trip_id, recorded_at);
 CREATE INDEX IF NOT EXISTS idx_checkins_trip ON member_checkins(trip_id);
-CREATE INDEX IF NOT EXISTS idx_org_phone ON organiser_accounts(phone);
+CREATE INDEX IF NOT EXISTS idx_org_user_id ON organiser_accounts(user_id);
 
 -- Tracking tokens for public share links
 CREATE TABLE IF NOT EXISTS tracking_tokens (
@@ -183,3 +183,9 @@ CREATE TABLE IF NOT EXISTS tracking_tokens (
 ALTER TABLE tracking_tokens ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "service_all_tokens" ON tracking_tokens FOR ALL USING (true);
 CREATE INDEX IF NOT EXISTS idx_token_val ON tracking_tokens(token);
+
+-- ── MIGRATION: if organiser_accounts already exists with phone column, add user_id ──
+-- Run this if you already deployed the previous schema:
+-- ALTER TABLE organiser_accounts ADD COLUMN IF NOT EXISTS user_id VARCHAR(100) UNIQUE;
+-- UPDATE organiser_accounts SET user_id = phone WHERE user_id IS NULL;
+-- ALTER TABLE organiser_accounts ALTER COLUMN user_id SET NOT NULL;
