@@ -7,6 +7,6 @@ router.use(authMiddleware);
 
 router.post('/:tripId', expenseController.addExpense);
 router.get('/:tripId', expenseController.getExpenses);
-router.get('/:tripId/settlements', expenseController.getSettlements);
+router.get('/:tripId/settlements', expenseController.getSettlements); // ✅ New
 
 export default router;
