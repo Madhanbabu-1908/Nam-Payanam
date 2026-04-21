@@ -72,53 +72,104 @@ export default function LiveMapPage() {
         <div className="flex items-center gap-3 pointer-events-auto">
           <button 
             onClick={() => navigate(-1)} 
-            className="p-3 bg-white dark:bg-slate-800 rounded-full shadow-lg hover:bg-gray-50 dark:hover:bg-slateThe errors indicate that the files got corrupted during copy-paste, likely due to hidden characters or formatting issues. The TypeScript compiler is seeing invalid syntax like `Unexpected keyword` and `Unterminated template literal`.
+            className="p-3 bg-white dark:bg-slate-800 rounded-full shadow-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition text-slate-800 dark:text-white"
+          >
+            <ArrowLeft size={20}/>
+          </button>
+          <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-md px-4 py-2 rounded-full shadow-lg flex items-center gap-2 border border-slate-200 dark:border-slate-700">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            <span className="font-bold text-sm text-slate-800 dark:text-white">Live Tracking</span>
+          </div>
+        </div>
+      </div>
 
-Here are the **clean, raw, copy-paste ready** versions of the files. Please delete your existing files and create new ones with this exact content.
+      <div className="w-full h-full z-0">
+        <MapContainer 
+          center={currentCenter} 
+          zoom={13} 
+          className="w-full h-full outline-none" 
+          scrollWheelZoom={true}
+          zoomControl={false}
+        >
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+          
+          {route.length > 1 && (            <Polyline positions={route} color="#94a3b8" weight={3} opacity={0.5} dashArray="5, 5" />
+          )}
 
-### 1. `frontend/src/config/api.ts` (Clean & Fixed)
+          {currentLocation && route.length > 1 && (
+            <Polyline 
+              positions={route.slice(0, route.findIndex((p: [number, number]) => 
+                Math.abs(p[0] - currentLocation.lat) < 0.001 && 
+                Math.abs(p[1] - currentLocation.lng) < 0.001
+              ) + 1)} 
+              color="#4f46e5" 
+              weight={4} 
+              opacity={0.8} 
+            />
+          )}
 
-```typescript
-import axios from 'axios';
-import { supabase } from './supabaseClient';
+          {route.length > 0 && (
+            <Marker position={route[0]} icon={new L.DivIcon({
+              html: `<div style="background:#10b981;color:white;padding:4px;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-weight:bold;">S</div>`,
+              className: '',
+              iconSize: [24, 24],
+              iconAnchor: [12, 12]
+            })}>
+              <Popup><strong>Start:</strong> {startLoc}</Popup>
+            </Marker>
+          )}
 
-const cache = new Map<string, any>();
+          {route.length > 0 && (
+            <Marker position={route[route.length - 1]} icon={new L.DivIcon({
+              html: `<div style="background:#ef4444;color:white;padding:4px;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-weight:bold;">D</div>`,
+              className: '',
+              iconSize: [24, 24],
+              iconAnchor: [12, 12]
+            })}>
+              <Popup><strong>Destination:</strong> {destLoc}</Popup>
+            </Marker>
+          )}
 
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
+          {currentLocation && (
+            <Marker position={[currentLocation.lat, currentLocation.lng]} icon={busIcon}>
+              <Popup>
+                <div className="text-center min-w-[150px]">
+                  <p className="font-bold text-indigo-600">Your Bus 🚌</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Updated: {lastUpdated?.toLocaleTimeString()}
+                  </p>
+                </div>
+              </Popup>
+            </Marker>
+          )}
+        </MapContainer>      </div>
 
-api.interceptors.request.use(
-  async (config) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (session?.access_token) {
-      config.headers.Authorization = `Bearer ${session.access_token}`;    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-api.interceptors.response.use(
-  (response) => {
-    if (response.config.method === 'get' && response.data) {
-      cache.set(response.config.url!, response.data);
-    }
-    return response;
-  },
-  (error) => {
-    if (!navigator.onLine && error.config && error.config.method === 'get') {
-      const cachedData = cache.get(error.config.url!);
-      if (cachedData) {
-        console.log("Serving from cache:", error.config.url);
-        return Promise.resolve({ data: cachedData });
-      }
-    }
-    return Promise.reject(error);
-  }
-);
-
-export { api };
+      {currentLocation && (
+        <div className="absolute bottom-6 left-4 right-4 bg-white/90 dark:bg-slate-800/90 backdrop-blur-md rounded-2xl shadow-xl p-4 z-[1000] animate-fade-in border border-slate-200 dark:border-slate-700 max-w-md mx-auto">
+          <div className="flex justify-between items-center mb-2">
+            <div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider">Route</p>
+              <p className="text-sm font-bold text-slate-800 dark:text-white flex items-center gap-1">
+                <MapPin size={14} className="text-emerald-500"/> {startLoc} → {destLoc}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider">Progress</p>
+              <p className="text-lg font-bold text-indigo-600 dark:text-indigo-400">{progress}%</p>
+            </div>
+          </div>
+          <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+            <div 
+              className="bg-indigo-600 h-full transition-all duration-500 ease-out"
+              style={{ width: `${progress}%` }}
+            ></div>
+          </div>
+          <p className="text-xs text-center mt-2 text-slate-400">Vehicle is moving towards destination</p>
+        </div>
+      )}
+    </div>
+  );
+}
