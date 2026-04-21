@@ -4,12 +4,11 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
+  darkMode: 'class', // ✅ Enable class-based dark mode
   theme: {
     extend: {
-      colors: {
-        primary: '#4F46E5',
-        secondary: '#10B981',
-        danger: '#EF4444',
+      fontFamily: {
+        sans: ['DM Sans', 'sans-serif'],
       },
     },
   },
