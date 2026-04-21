@@ -14,7 +14,9 @@ export default function Home() {
   useEffect(() => {
     const fetchTrips = async () => {
       try {
-        const res = await api.get('/trips'); 
+        // ✅ CHANGED: Call the new '/trips/my' endpoint
+        const res = await api.get('/trips/my'); 
+        
         if (res.data.success && Array.isArray(res.data.data)) {
            setTrips(res.data.data);
         } else if (Array.isArray(res.data)) {
