@@ -9,30 +9,32 @@ export const expenseController = {
       const { amount, description, category, date } = req.body;
       const userId = req.user!.id;
 
-      // 1. Verify user is a member of this trip
-      const {  memberCheck } = await supabaseAdmin
+      // 1. Verify Membership
+      const { data: member, error: memberError } = await supabaseAdmin
         .from('trip_members')
         .select('id')
         .eq('trip_id', tripId)
         .eq('user_id', userId)
         .single();
 
-      if (!memberCheck) {
+      if (memberError || !member) {
         return res.status(403).json({ success: false, error: 'Not a member of this trip' });
       }
 
-      // 2. Get all members to split equally
-      const {  members } = await supabaseAdmin
+      // 2. Get All Members for Equal Split
+      const { data: members, error: membersError } = await supabaseAdmin
         .from('trip_members')
         .select('user_id')
         .eq('trip_id', tripId);
 
-      if (!members || members.length === 0) throw new Error('No members found');
+      if (membersError || !members || members.length === 0) {
+        throw new Error('No members found in trip');
+      }
 
       const splitAmount = amount / members.length;
 
       // 3. Insert Expense
-      const {  expense, error: expError } = await supabaseAdmin
+      const { data: expense, error: expError } = await supabaseAdmin
         .from('expenses')
         .insert({
           trip_id: tripId,
@@ -46,8 +48,8 @@ export const expenseController = {
         .single();
 
       if (expError) throw expError;
-
-      // 4. Insert Splits (Who owes what)      const splits = members.map(m => ({
+      // 4. Insert Splits (Who owes what)
+      const splits = members.map(m => ({
         expense_id: expense.id,
         user_id: m.user_id,
         amount_owed: splitAmount,
@@ -68,11 +70,7 @@ export const expenseController = {
       const { tripId } = req.params;
       const { data, error } = await supabaseAdmin
         .from('expenses')
-        .select(`
-          *,
-          paid_by:user_id (email, full_name),
-          splits (user_id, amount_owed, is_settled)
-        `)
+        .select('*')
         .eq('trip_id', tripId)
         .order('date', { ascending: false });
 
@@ -83,47 +81,88 @@ export const expenseController = {
     }
   },
 
+  // ✅ NEW: Smart Settlements Calculator
   getSettlements: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { tripId } = req.params;
-      // Complex query to calculate net balance per user could go here.
-      // For MVP, we return raw splits data for frontend calculation or a simplified summary.
-      
-      const { data, error } = await supabaseAdmin
-        .from('expense_splits')
-        .select(`
-          user_id,
-          amount_owed,
-          is_settled,
-          expense:paid_by_user_id (id) 
-        `)        .eq('expense.trip_id', tripId); // Note: Requires joining through expense table
 
-      // Simplified fallback: Just return all splits for this trip's expenses
-      const {  expenses } = await supabaseAdmin
+      // Fetch all expenses
+      const { data: expenses, error: expError } = await supabaseAdmin
         .from('expenses')
-        .select('id, paid_by_user_id')
+        .select('id, amount, paid_by_user_id')
         .eq('trip_id', tripId);
-      
-      if (!expenses) return res.json({ success: true, data: [] });
 
+      if (expError) throw expError;
+      if (!expenses || expenses.length === 0) {
+        return res.json({ success: true, data: { balances: {}, transactions: [] } });
+      }
+      // Fetch all splits
       const expenseIds = expenses.map(e => e.id);
-      const {  splits } = await supabaseAdmin
+      const { data: allSplits, error: splitError } = await supabaseAdmin
         .from('expense_splits')
-        .select('*')
+        .select('expense_id, user_id, amount_owed')
         .in('expense_id', expenseIds);
 
-      // Calculate Net Balance Logic (Simplified)
-      // Map: UserId -> { paid: 0, owes: 0 }
-      const balances: Record<string, { paid: number; owes: number }> = {};
-      
+      if (splitError) throw splitError;
+
+      // Calculate Net Balance per User
+      // Logic: Balance = (Total Paid by User) - (Total Owed by User)
+      const balances: Record<string, number> = {};
+      const userIds = new Set<string>();
+
+      expenses.forEach(e => userIds.add(e.paid_by_user_id));
+      allSplits?.forEach(s => userIds.add(s.user_id));
+
+      // Initialize balances to 0
+      userIds.forEach(id => balances[id] = 0);
+
+      // Process Expenses
       expenses.forEach(exp => {
-        const pid = exp.paid_by_user_id;
-        if (!balances[pid]) balances[pid] = { paid: 0, owes: 0 };
-        // Find total amount of this expense (need to fetch amount too, skipping for brevity in this snippet)
-        // In production, do this calculation in one SQL query or robust JS loop
+        const payer = exp.paid_by_user_id;
+        balances[payer] += exp.amount; // They paid this much (Credit)
+
+        // Subtract what everyone owes for this expense (Debit)
+        const relatedSplits = allSplits?.filter(s => s.expense_id === exp.id) || [];
+        relatedSplits.forEach(split => {
+          balances[split.user_id] -= split.amount_owed;
+        });
       });
 
-      res.json({ success: true, data: splits, message: "Raw splits returned. Frontend can calculate net." });
+      // Generate Minimal Transactions (Greedy Algorithm)
+      const debtors: { id: string; amount: number }[] = [];
+      const creditors: { id: string; amount: number }[] = [];
+
+      Object.entries(balances).forEach(([id, amount]) => {
+        if (amount < -0.01) debtors.push({ id, amount }); // Negative balance = owes money
+        if (amount > 0.01) creditors.push({ id, amount }); // Positive balance = owed money
+      });
+
+      // Sort to optimize matching
+      debtors.sort((a, b) => a.amount - b.amount); // Most negative first
+      creditors.sort((a, b) => b.amount - a.amount); // Most positive first
+
+      const transactions: any[] = [];
+      let i = 0, j = 0;
+
+      while (i < debtors.length && j < creditors.length) {
+        const debtor = debtors[i];        const creditor = creditors[j];
+
+        const amount = Math.min(Math.abs(debtor.amount), creditor.amount);
+
+        transactions.push({
+          from: debtor.id,
+          to: creditor.id,
+          amount: parseFloat(amount.toFixed(2))
+        });
+
+        debtor.amount += amount;
+        creditor.amount -= amount;
+
+        if (Math.abs(debtor.amount) < 0.01) i++;
+        if (creditor.amount < 0.01) j++;
+      }
+
+      res.json({ success: true, data: { balances, transactions } });
     } catch (error: any) {
       next(error);
     }
