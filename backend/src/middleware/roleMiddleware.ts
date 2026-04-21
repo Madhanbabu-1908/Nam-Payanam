@@ -1,6 +1,6 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from './authMiddleware';
-import { tripService } from '../services/tripService';
+import { supabaseAdmin } from '../config/db';
 
 export const requireOrganizer = async (req: AuthRequest, res: Response, next: NextFunction) => {
   const tripId = req.params.tripId || req.body.tripId;
@@ -15,9 +15,18 @@ export const requireOrganizer = async (req: AuthRequest, res: Response, next: Ne
   }
 
   try {
-    const isOrganizer = await tripService.verifyOrganizer(tripId, userId);
+    // Directly check the database for organizer status
+    const { data: trip, error } = await supabaseAdmin
+      .from('trips')
+      .select('organizer_id')
+      .eq('id', tripId)
+      .single();
 
-    if (!isOrganizer) {
+    if (error || !trip) {
+      return res.status(404).json({ success: false, error: 'Trip not found' });
+    }
+
+    if (trip.organizer_id !== userId) {
       return res.status(403).json({ 
         success: false, 
         error: 'Access Denied: Only the Organizer can perform this action.' 
@@ -26,6 +35,7 @@ export const requireOrganizer = async (req: AuthRequest, res: Response, next: Ne
 
     next();
   } catch (error) {
+    console.error("Role Middleware Error:", error);
     return res.status(500).json({ success: false, error: 'Error checking permissions' });
   }
 };
