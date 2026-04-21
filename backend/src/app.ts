@@ -15,11 +15,11 @@ app.use(helmet());
 
 // 2. CORS Configuration
 // Update the origin with your actual frontend URL when deployed
+// Update the cors line in app.ts
 app.use(cors({
-  origin: ['http://localhost:3000', 'https://nam-payanam.onrender.com', '*'], 
+  origin: '*', // Allow all origins for testing
   credentials: true,
 }));
-
 // 3. Request Logging
 if (env.NODE_ENV !== 'production') {
   app.use(morgan('dev'));
