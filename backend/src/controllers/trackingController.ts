@@ -1,70 +1,109 @@
-import { Response, NextFunction } from 'express';
+import { Response, NextFunction, Request } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { supabaseAdmin } from '../config/db';
 import crypto from 'crypto';
 
+// Extend Express Request to include params and body types
+interface TrackingRequest extends Request {
+  params: { token: string; tripId: string };
+  body: { latitude: number; longitude: number; speed?: number };
+}
+
 export const trackingController = {
-  // Generate a secure token for the driver
+  // Generate a secure token for the driver (Organizer only)
   createToken: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { tripId } = req.params;
       const userId = req.user!.id;
 
       // Verify Organizer
-      const { data: trip } = await supabaseAdmin.from('trips').select('organizer_id').eq('id', tripId).single();
-      if (!trip || trip.organizer_id !== userId) {
-        return res.status(403).json({ success: false, error: 'Only organizer can generate tracking link' });
+      const { data: trip, error: tripError } = await supabaseAdmin
+        .from('trips')
+        .select('organizer_id')
+        .eq('id', tripId)
+        .single();
+
+      if (tripError || !trip || trip.organizer_id !== userId) {
+        return res.status(403).json({ 
+          success: false, 
+          error: 'Only organizer can generate tracking link' 
+        });
       }
 
-      const token = crypto.randomBytes(8).toString('hex'); // Secure random token
+      const token = crypto.randomBytes(8).toString('hex');
 
-      const { data, error } = await supabaseAdmin.from('tracking_tokens').insert({
-        trip_id: tripId,
-        token,
-        is_active: true
-      }).select().single();
+      const { data, error } = await supabaseAdmin
+        .from('tracking_tokens')
+        .insert({
+          trip_id: tripId,
+          token,
+          is_active: true
+        })
+        .select()
+        .single();
 
       if (error) throw error;
 
-      // Construct public tracking URL
-      const trackingUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/track/${token}`;
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const trackingUrl = `${frontendUrl}/track/${token}`;
 
-      res.json({ success: true, data: { token, url: trackingUrl } });
-    } catch (error: any) { next(error); }
+      res.json({         success: true, 
+        data: { token, url: trackingUrl } 
+      });
+    } catch (error: any) {
+      next(error);
+    }
   },
 
-  // Driver sends location update
-  pushLocation: async (req: Request, res: Response, next: NextFunction) => {
+  // Driver sends location update (Public endpoint with token)
+  pushLocation: async (req: TrackingRequest, res: Response, next: NextFunction) => {
     try {
       const { token } = req.params;
       const { latitude, longitude, speed } = req.body;
 
+      if (!latitude || !longitude) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Latitude and Longitude are required' 
+        });
+      }
+
       // Verify Token
-      const { data: tokenData } = await supabaseAdmin.from('tracking_tokens')
+      const { data: tokenData, error: tokenError } = await supabaseAdmin
+        .from('tracking_tokens')
         .select('trip_id')
         .eq('token', token)
         .eq('is_active', true)
         .single();
 
-      if (!tokenData) {
-        return res.status(401).json({ success: false, error: 'Invalid or expired tracking token' });
+      if (tokenError || !tokenData) {
+        return res.status(401).json({ 
+          success: false, 
+          error: 'Invalid or expired tracking token' 
+        });
       }
 
       // Log Location
-      const { error } = await supabaseAdmin.from('location_logs').insert({
-        trip_id: tokenData.trip_id,
-        latitude,
-        longitude,
-        speed: speed || 0
+      const { error: logError } = await supabaseAdmin
+        .from('location_logs')
+        .insert({
+          trip_id: tokenData.trip_id,
+          latitude,
+          longitude,
+          speed: speed || 0
+        });
+
+      if (logError) throw logError;
+
+      res.json({ 
+        success: true,         message: 'Location updated successfully' 
       });
-
-      if (error) throw error;
-
-      res.json({ success: true, message: 'Location updated' });
-    } catch (error: any) { next(error); }
+    } catch (error: any) {
+      next(error);
+    }
   },
 
-  // Get latest location for a trip
+  // Get latest location for a trip (Protected)
   getLiveLocation: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { tripId } = req.params;
@@ -77,9 +116,15 @@ export const trackingController = {
         .limit(1)
         .single();
 
-      if (error && error.code !== 'PGRST116') throw error; // PGRST116 = No rows found
+      // PGRST116 means no rows found, which is fine (return null)
+      if (error && error.code !== 'PGRST116') throw error;
 
-      res.json({ success: true, data });
-    } catch (error: any) { next(error); }
+      res.json({ 
+        success: true, 
+        data: data || null 
+      });
+    } catch (error: any) {
+      next(error);
+    }
   }
 };
