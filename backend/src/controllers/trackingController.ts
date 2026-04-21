@@ -4,50 +4,22 @@ import { supabaseAdmin } from '../config/db';
 import crypto from 'crypto';
 import axios from 'axios';
 
-// Ensure axios is installed: npm install axios
-
 interface TrackingRequest extends Request {
   params: { token: string; tripId: string };
   body: { latitude: number; longitude: number; speed?: number };
 }
 
-/**
- * Helper: Geocode address using Nominatim
- */
-const geocodeAddress = async (address: string): Promise<[number, number] | null> => {
-  ifThe errors are caused by **syntax issues** in the `trackingController.ts` file, specifically around object destructuring and property assignments. The previous code snippet had some formatting issues that TypeScript didn't like.
-
-Here is the **corrected, syntactically valid, and complete** `backend/src/controllers/trackingController.ts` file.
-
-### 📄 `backend/src/controllers/trackingController.ts` (Fixed & Complete)
-
-```typescript
-import { Response, NextFunction, Request } from 'express';
-import { AuthRequest } from '../middleware/authMiddleware';
-import { supabaseAdmin } from '../config/db';
-import crypto from 'crypto';
-import axios from 'axios';
-
-// Ensure axios is installed: npm install axios
-
-interface TrackingRequest extends Request {
-  params: { token: string; tripId: string };
-  body: { latitude: number; longitude: number; speed?: number };
-}
-
-/**
- * Helper: Geocode address using Nominatim
- */
 const geocodeAddress = async (address: string): Promise<[number, number] | null> => {
   if (!address) return null;
   try {
-    const query = `${address}, India`; // Contextualize for India
+    const query = `${address}, India`;
     const response = await axios.get('https://nominatim.openstreetmap.org/search', {
       params: { q: query, format: 'json', limit: 1 },
       headers: { 'User-Agent': 'Nam-Payanam-App/1.0' }
     });
     if (response.data && response.data.length > 0) {
-      return [parseFloat(response.data[0].lat), parseFloat(response.data[0].lon)];    }
+      return [parseFloat(response.data[0].lat), parseFloat(response.data[0].lon)];
+    }
     return null;
   } catch (e) {
     console.error("Geocoding error:", e);
@@ -55,16 +27,11 @@ const geocodeAddress = async (address: string): Promise<[number, number] | null>
   }
 };
 
-/**
- * Helper: Get Driving Route using OSRM
- */
 const getDrivingRoute = async (start: [number, number], end: [number, number]): Promise<[number, number][]> => {
   try {
-    // OSRM uses lng,lat
     const url = `http://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson`;
     const res = await axios.get(url);
     if (res.data.routes && res.data.routes.length > 0) {
-      // Convert GeoJSON [lng, lat] to Leaflet [lat, lng]
       return res.data.routes[0].geometry.coordinates.map((c: [number, number]) => [c[1], c[0]]);
     }
     return [];
@@ -74,45 +41,32 @@ const getDrivingRoute = async (start: [number, number], end: [number, number]): 
   }
 };
 
-/**
- * Main Logic: Calculate and Save Route
- */
 const calculateAndSaveRoute = async (tripId: string, startLoc: string, endLoc: string) => {
-  // 1. Check if route already exists to avoid recalculation
   const { data: trip } = await supabaseAdmin.from('trips').select('route_data').eq('id', tripId).single();
-  if (trip && trip.route_data) return trip.route_data; // Return cached route
+  if (trip && trip.route_data) return trip.route_data;
 
-  // 2. Geocode
   const startCoords = await geocodeAddress(startLoc);
   const endCoords = await geocodeAddress(endLoc);
-
   if (!startCoords || !endCoords) {
     console.warn("Could not geocode locations for route.");
     return [];
   }
 
-  // 3. Get Route
   const route = await getDrivingRoute(startCoords, endCoords);
 
-  // 4. Save to DB for future fast access
   if (route && route.length > 0) {
-    await supabaseAdmin.from('trips').update({ route_data: route }).eq('id', tripId);  }
+    await supabaseAdmin.from('trips').update({ route_data: route }).eq('id', tripId);
+  }
 
   return route;
 };
 
 export const trackingController = {
-  
-  /**
-   * Create Token AND Calculate Route
-   * POST /api/tracking/tokens/:tripId
-   */
   createToken: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { tripId } = req.params;
       const userId = req.user!.id;
 
-      // Verify Organizer & Get Trip Details
       const { data: trip, error: tripError } = await supabaseAdmin
         .from('trips')
         .select('organizer_id, start_location, destination')
@@ -123,10 +77,8 @@ export const trackingController = {
         return res.status(403).json({ success: false, error: 'Unauthorized' });
       }
 
-      // Generate Token
       const token = crypto.randomBytes(8).toString('hex');
 
-      // Insert Token
       const { error: tokenErr } = await supabaseAdmin.from('tracking_tokens').insert({
         trip_id: tripId,
         token,
@@ -134,9 +86,6 @@ export const trackingController = {
       });
       if (tokenErr) throw tokenErr;
 
-      // 🔥 CRITICAL: Calculate and Save Route asynchronously (don't wait for it to send response)
-      // We fire-and-forget here so the user gets the token instantly.
-      // The route will be ready by the time they open the map.
       if (trip.start_location && trip.destination) {
         calculateAndSaveRoute(tripId, trip.start_location, trip.destination).catch(console.error);
       }
@@ -145,15 +94,11 @@ export const trackingController = {
       res.json({ 
         success: true, 
         data: { token, url: `${frontendUrl}/track/${token}` } 
-      });    } catch (error: any) {
-      next(error);
-    }
+      });
+    } catch (error: any) {
+      next(error);    }
   },
 
-  /**
-   * Push Location (Driver)
-   * POST /api/tracking/push/:token
-   */
   pushLocation: async (req: TrackingRequest, res: Response, next: NextFunction) => {
     try {
       const { token } = req.params;
@@ -181,23 +126,18 @@ export const trackingController = {
     }
   },
 
-  /**
-   * Get Live Data (Map View)
-   * GET /api/tracking/live/:tripId
-   */
   getLiveLocation: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { tripId } = req.params;
 
-      // 1. Get Current Location
       const { data: currentLoc } = await supabaseAdmin
         .from('location_logs')
         .select('*')
         .eq('trip_id', tripId)
-        .order('timestamp', { ascending: false })        .limit(1)
+        .order('timestamp', { ascending: false })
+        .limit(1)
         .single();
 
-      // 2. Get Pre-Calculated Route from DB
       const { data: trip } = await supabaseAdmin
         .from('trips')
         .select('route_data, start_location, destination')
@@ -205,8 +145,6 @@ export const trackingController = {
         .single();
 
       let route = trip?.route_data || [];
-
-      // Fallback: If route is empty (maybe calc failed earlier), try calculating now
       if ((!route || route.length === 0) && trip?.start_location && trip?.destination) {
          route = await calculateAndSaveRoute(tripId, trip.start_location, trip.destination);
       }
@@ -225,10 +163,6 @@ export const trackingController = {
     }
   },
 
-  /**
-   * Public Track
-   * GET /api/tracking/public/:token
-   */
   getPublicLocation: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { token } = req.params;
@@ -243,5 +177,6 @@ export const trackingController = {
       res.json({ success: true, data: loc || null });
     } catch (error: any) {
       next(error);
-    }  }
+    }
+  }
 };
