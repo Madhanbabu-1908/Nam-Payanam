@@ -1,21 +1,25 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../config/api';
+import { ArrowLeft, Sparkles, PencilLine, MapPin, Calendar, DollarSign, Tag } from 'lucide-react';
 import { Button } from '../components/common/Button';
-import { ArrowLeft } from 'lucide-react';
 
 export default function CreateTrip() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<'AI' | 'MANUAL'>('AI');
   const [formData, setFormData] = useState({ 
-    name: '', destination: '', start_date: '', end_date: '', budget: '', interests: '', start_location: '' 
+    name: '', 
+    destination: '', 
+    start_date: '', 
+    end_date: '', 
+    budget: '', 
+    interests: '', 
+    start_location: '' 
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Prevent double submission
     if (loading) return;
 
     setLoading(true);
@@ -31,7 +35,6 @@ export default function CreateTrip() {
       
       if (res.data.success && res.data.data) {
         const tripId = res.data.data.id;
-        // Small delay to ensure DB replication if any, then navigate
         setTimeout(() => {
           navigate(`/dashboard/${tripId}`, { replace: true });
         }, 500);
@@ -40,79 +43,165 @@ export default function CreateTrip() {
       }
     } catch (err: any) {
       alert(err.response?.data?.error || 'Failed to create trip. Please try again.');
-      setLoading(false); // Only reset loading on error
+      setLoading(false);
     }
   };
 
+  const handleInputChange = (field: string, value: string) => {    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-2xl mx-auto">
-        <button onClick={() => navigate(-1)} className="flex items-center text-gray-500 hover:text-gray-800 mb-4">          <ArrowLeft className="h-4 w-4 mr-1"/> Back
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-20">
+      {/* Header */}
+      <header className="glass sticky top-0 z-20 px-6 py-4 flex items-center gap-3 backdrop-blur-md bg-white/80 dark:bg-slate-800/80 border-b border-slate-200/50 dark:border-slate-700">
+        <button onClick={() => navigate(-1)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition">
+          <ArrowLeft className="text-slate-600 dark:text-slate-300" />
         </button>
-        <div className="bg-white p-8 rounded-xl shadow-lg">
-          <h2 className="text-2xl font-bold mb-2">Create New Trip</h2>
-          <p className="text-gray-500 mb-6">Plan your next adventure with AI or manually.</p>
+        <h1 className="text-xl font-bold text-slate-800 dark:text-white">Create New Trip</h1>
+      </header>
+
+      <main className="max-w-2xl mx-auto p-6 space-y-8 animate-fade-in">
+        
+        {/* Mode Selector */}
+        <div className="bg-white dark:bg-slate-800 p-2 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex">
+          <button
+            type="button"
+            onClick={() => setMode('AI')}
+            className={`flex-1 py-3 px-4 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all ${
+              mode === 'AI'
+                ? 'bg-indigo-600 text-white shadow-md'
+                : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
+            }`}
+          >
+            <Sparkles size={20} /> AI Plan
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('MANUAL')}
+            className={`flex-1 py-3 px-4 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all ${
+              mode === 'MANUAL'
+                ? 'bg-indigo-600 text-white shadow-md'
+                : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
+            }`}
+          >
+            <PencilLine size={20} /> Manual
+          </button>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-6">
           
-          <div className="flex mb-6 bg-gray-100 p-1 rounded-lg w-fit">
-            <button 
-              type="button"
-              onClick={() => setMode('AI')} 
-              className={`px-4 py-2 rounded-md text-sm font-medium transition ${mode === 'AI' ? 'bg-white shadow text-indigo-600' : 'text-gray-500'}`}
-            >
-              ✨ AI Plan
-            </button>
-            <button 
-              type="button"
-              onClick={() => setMode('MANUAL')} 
-              className={`px-4 py-2 rounded-md text-sm font-medium transition ${mode === 'MANUAL' ? 'bg-white shadow text-indigo-600' : 'text-gray-500'}`}
-            >
-              📝 Manual
-            </button>
+          {/* Trip Name */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
+              <Tag size={16} /> Trip Name
+            </label>
+            <input              required
+              placeholder="e.g., Ooty Summer Ride"
+              className="w-full p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-800 dark:text-white placeholder-slate-400"
+              value={formData.name}
+              onChange={(e) => handleInputChange('name', e.target.value)}
+            />
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Destination & Start Location */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Trip Name</label>
-              <input required placeholder="e.g., Ooty Summer Ride" className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Destination</label>
-                <input required placeholder="e.g., Ooty" className="w-full p-2 border rounded" value={formData.destination} onChange={e => setFormData({...formData, destination: e.target.value})} />
-              </div>
-              {mode === 'AI' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Start Location</label>
-                  <input required placeholder="e.g., Salem" className="w-full p-2 border rounded" value={formData.start_location} onChange={e => setFormData({...formData, start_location: e.target.value})} />
-                </div>
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
-                <input type="date" required className="w-full p-2 border rounded" value={formData.start_date} onChange={e => setFormData({...formData, start_date: e.target.value})} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
-                <input type="date" required className="w-full p-2 border rounded" value={formData.end_date} onChange={e => setFormData({...formData, end_date: e.target.value})} />
-              </div>
-            </div>            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Total Budget (₹)</label>
-              <input type="number" required placeholder="10000" className="w-full p-2 border rounded" value={formData.budget} onChange={e => setFormData({...formData, budget: e.target.value})} />
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
+                <MapPin size={16} /> Destination
+              </label>
+              <input
+                required
+                placeholder="e.g., Ooty"
+                className="w-full p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-800 dark:text-white placeholder-slate-400"
+                value={formData.destination}
+                onChange={(e) => handleInputChange('destination', e.target.value)}
+              />
             </div>
             {mode === 'AI' && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Interests (comma separated)</label>
-                <textarea placeholder="Nature, Tea Estates, Trekking" className="w-full p-2 border rounded" rows={3} value={formData.interests} onChange={e => setFormData({...formData, interests: e.target.value})} />
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
+                  <MapPin size={16} /> Start Location
+                </label>
+                <input
+                  required
+                  placeholder="e.g., Salem"
+                  className="w-full p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-800 dark:text-white placeholder-slate-400"
+                  value={formData.start_location}
+                  onChange={(e) => handleInputChange('start_location', e.target.value)}
+                />
               </div>
             )}
-            {/* ✅ Button is disabled when loading */}
-            <Button type="submit" isLoading={loading} className="w-full mt-4" disabled={loading}>
-              {loading ? 'Creating Trip...' : 'Create Trip'}
-            </Button>
-          </form>
-        </div>
-      </div>
+          </div>
+
+          {/* Dates */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
+                <Calendar size={16} /> Start Date
+              </label>
+              <input
+                type="date"
+                required
+                className="w-full p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-800 dark:text-white"
+                value={formData.start_date}
+                onChange={(e) => handleInputChange('start_date', e.target.value)}              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
+                <Calendar size={16} /> End Date
+              </label>
+              <input
+                type="date"
+                required
+                className="w-full p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-800 dark:text-white"
+                value={formData.end_date}
+                onChange={(e) => handleInputChange('end_date', e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Budget */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
+              <DollarSign size={16} /> Total Budget (₹)
+            </label>
+            <input
+              type="number"
+              required
+              placeholder="10000"
+              className="w-full p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-800 dark:text-white placeholder-slate-400"
+              value={formData.budget}
+              onChange={(e) => handleInputChange('budget', e.target.value)}
+            />
+          </div>
+
+          {/* Interests (AI Only) */}
+          {mode === 'AI' && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
+                <Tag size={16} /> Interests (comma separated)
+              </label>
+              <textarea
+                placeholder="Nature, Tea Estates, Trekking"
+                rows={3}
+                className="w-full p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-800 dark:text-white placeholder-slate-400 resize-none"
+                value={formData.interests}
+                onChange={(e) => handleInputChange('interests', e.target.value)}
+              />
+            </div>
+          )}
+
+          {/* Submit Button */}
+          <Button
+            type="submit"            isLoading={loading}
+            disabled={loading}
+            className="w-full py-4 text-lg font-bold mt-4"
+          >
+            {loading ? 'Creating Your Adventure...' : 'Create Trip'}
+          </Button>
+        </form>
+      </main>
     </div>
   );
 }
