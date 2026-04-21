@@ -51,7 +51,7 @@ export default function CreateTrip() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-20">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-24"> {/* ✅ Added pb-24 for space */}
       {/* Header */}
       <header className="glass sticky top-0 z-20 px-6 py-4 flex items-center gap-3 backdrop-blur-md bg-white/80 dark:bg-slate-800/80 border-b border-slate-200/50 dark:border-slate-700">
         <button onClick={() => navigate(-1)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition">
@@ -192,14 +192,16 @@ export default function CreateTrip() {
             </div>
           )}
 
-          {/* Submit Button */}
-          <Button
-            type="submit"            isLoading={loading}
-            disabled={loading}
-            className="w-full py-4 text-lg font-bold mt-4"
-          >
-            {loading ? 'Creating Your Adventure...' : 'Create Trip'}
-          </Button>
+          {/* ✅ VISIBLE SUBMIT BUTTON */}
+          <div className="pt-4 pb-8">
+            <Button              type="submit"
+              isLoading={loading}
+              disabled={loading}
+              className="w-full py-4 text-lg font-bold shadow-lg shadow-indigo-200 dark:shadow-none"
+            >
+              {loading ? 'Creating Your Adventure...' : 'Create Trip'}
+            </Button>
+          </div>
         </form>
       </main>
     </div>
