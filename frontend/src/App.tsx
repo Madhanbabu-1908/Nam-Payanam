@@ -13,53 +13,42 @@ import ExpensesPage from './pages/ExpensesPage';
 import MembersPage from './pages/MembersPage';
 import SettingsPage from './pages/SettingsPage';
 import ProfilePage from './pages/ProfilePage';
-import SettlementsPage from './pages/SettlementsPage'; // ✅ New
-import CheckinPage from './pages/CheckinPage';       // ✅ New
+import SettlementsPage from './pages/SettlementsPage';
+import CheckinPage from './pages/CheckinPage';
+import LiveMapPage from './pages/LiveMapPage';       // ✅ Ensure this is imported
+import DriverSimulator from './pages/DriverSimulator'; // ✅ Ensure this is imported
+import PublicTrackPage from './pages/PublicTrackPage'; // ✅ Ensure this is imported
 
-// Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading } = useAuth();
-  
-  if (loading) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-slate-500 dark:text-slate-400 font-medium">Loading Nam-Payanam...</p>
-        </div>
-      </div>
-    );
-  }
-  
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-  
+  if (loading) return <div className="h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900"><div className="animate-spin h-10 w-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full"></div></div>;
+  if (!user) return <Navigate to="/login" replace />;
   return <>{children}</>;
 };
 
 function AppRoutes() {
   return (
     <Routes>
-      {/* Public Routes */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       
-      {/* Protected Global Routes */}
       <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
       <Route path="/create-trip" element={<ProtectedRoute><CreateTrip /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
       
-      {/* Protected Trip-Specific Routes */}
       <Route path="/dashboard/:tripId" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/dashboard/:tripId/itinerary" element={<ProtectedRoute><ItineraryPage /></ProtectedRoute>} />
       <Route path="/dashboard/:tripId/expenses" element={<ProtectedRoute><ExpensesPage /></ProtectedRoute>} />
-      <Route path="/dashboard/:tripId/settlements" element={<ProtectedRoute><SettlementsPage /></ProtectedRoute>} /> {/* ✅ New */}
-      <Route path="/dashboard/:tripId/checkin" element={<ProtectedRoute><CheckinPage /></ProtectedRoute>} />       {/* ✅ New */}
+      <Route path="/dashboard/:tripId/settlements" element={<ProtectedRoute><SettlementsPage /></ProtectedRoute>} />
+      <Route path="/dashboard/:tripId/checkin" element={<ProtectedRoute><CheckinPage /></ProtectedRoute>} />
       <Route path="/dashboard/:tripId/members" element={<ProtectedRoute><MembersPage /></ProtectedRoute>} />
       <Route path="/dashboard/:tripId/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
       
-      {/* Catch All */}
+      {/* ✅ MAP ROUTES */}
+      <Route path="/dashboard/:tripId/live" element={<ProtectedRoute><LiveMapPage /></ProtectedRoute>} />
+      <Route path="/dashboard/:tripId/simulate" element={<ProtectedRoute><DriverSimulator /></ProtectedRoute>} />
+      <Route path="/track/:token" element={<PublicTrackPage />} /> {/* Public */}
+      
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
