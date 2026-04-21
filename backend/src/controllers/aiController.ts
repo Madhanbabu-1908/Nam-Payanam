@@ -15,7 +15,9 @@ export const aiController = {
         .eq('id', tripId)
         .single();
 
-      if (tripError || !trip) throw new Error('Trip not found');
+      if (tripError || !trip) {
+        return res.status(404).json({ success: false, error: 'Trip not found' });
+      }
 
       // Call AI Service
       const days = Math.ceil((new Date(trip.end_date).getTime() - new Date(trip.start_date).getTime()) / (1000 * 60 * 60 * 24)) + 1;
@@ -24,14 +26,18 @@ export const aiController = {
         destination: trip.destination,
         days,
         budget: trip.budget,
-        interests: ['General Sightseeing'], // Could be passed in body
-        startLocation: 'Unknown' // Could be stored in trip
+        interests: ['General Sightseeing'], // Could be passed in body or from trip details
+        startLocation: trip.start_location || 'Unknown'
       });
 
-      // Delete old items and insert new ones
+      // Delete old items
       await supabaseAdmin.from('itinerary_items').delete().eq('trip_id', tripId);
 
-      const itemsToInsert = aiItems.map(item => ({ ...item, trip_id: tripId }));
+      // ✅ FIX: Explicitly define the type for 'item' or use 'any' temporarily
+      const itemsToInsert = aiItems.map((item: any) => ({ 
+        ...item, 
+        trip_id: tripId 
+      }));
       
       if (itemsToInsert.length > 0) {
         const { data, error } = await supabaseAdmin
@@ -40,9 +46,9 @@ export const aiController = {
           .select();
           
         if (error) throw error;
-        res.json({ success: true, message: 'Itinerary regenerated', data });
+        return res.json({ success: true, message: 'Itinerary regenerated', data });
       } else {
-        res.json({ success: true, message: 'No items generated', data: [] });
+        return res.json({ success: true, message: 'No items generated', data: [] });
       }
 
     } catch (error: any) {
