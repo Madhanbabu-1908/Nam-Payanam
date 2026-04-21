@@ -1,56 +1,67 @@
-import { groqClient } from '../config/groq';
-import { ItineraryItem } from '../types'; // ✅ Fixed import
+import { Groq } from 'groq-sdk';
+import { env } from '../config/env';
 
-interface AIPlanRequest {
-  destination: string;
-  days: number;
-  budget: number;
-  interests: string[];
-  startLocation: string;
-}
+const groq = new Groq({ apiKey: env.GROQ_API_KEY });
 
 export const aiService = {
-  async generateItinerary(params: AIPlanRequest): Promise<ItineraryItem[]> {
-    const prompt = `
-      Act as a professional travel planner. Create a ${params.days}-day itinerary for a trip from ${params.startLocation} to ${params.destination}.
-      Total Budget: ₹${params.budget}.
-      Interests: ${params.interests.join(', ')}.
+  generateItinerary: async (params: {
+    destination: string;
+    days: number;
+    budget: number;
+    interests: string[];
+    startLocation: string;
+  }) => {
+    const { destination, days, budget, interests, startLocation } = params;
 
-      Return ONLY a valid JSON array of objects. Do not include markdown formatting.
+    const prompt = `
+      Create a ${days}-day travel itinerary for ${destination}.
+      Start location: ${startLocation}.
+      Total Budget: ₹${budget}.
+      Interests: ${interests.join(', ')}.
+      
+      Return ONLY a valid JSON array of objects. Do not include markdown formatting or explanations.
       Each object must have:
-      - day_number (integer)
-      - time_slot (string)
+      - day_number (number)
+      - time_slot (string, e.g., "Morning", "Afternoon")
       - location_name (string)
-      - description (string)
-      - estimated_cost (number)
+      - description (string, brief activity)
+      - estimated_cost (number, approximate cost in INR)
+      
+      Example format:
+      [
+        {"day_number": 1, "time_slot": "Morning", "location_name": "Place A", "description": "Visit...", "estimated_cost": 500},
+        ...
+      ]
     `;
 
     try {
-      const completion = await groqClient.chat.completions.create({
-        messages: [{ role: 'user', content: prompt }],
-        model: 'llama3-70b-8192',
+      const chatCompletion = await groq.chat.completions.create({
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert travel planner. Output ONLY valid JSON.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        // ✅ UPDATED MODEL ID HERE
+        model: 'llama-3.1-70b-versatile', 
         temperature: 0.7,
-        response_format: { type: 'json_object' },
+        max_tokens: 4096,
+        top_p: 1,
+        stream: false,
+        response_format: { type: 'json_object' } // Ensures JSON output
       });
 
-      const content = completion.choices[0]?.message?.content;
-      if (!content) throw new Error('No response from AI');
-
-      const parsedResponse = JSON.parse(content);
-      const items = Array.isArray(parsedResponse) ? parsedResponse : (parsedResponse.itinerary || []);
-
-      return items.map((item: any) => ({
-        id: '',
-        trip_id: '',
-        day_number: item.day_number,
-        time_slot: item.time_slot,
-        location_name: item.location_name,
-        description: item.description,
-        estimated_cost: item.estimated_cost,
-        latitude: null,
-        longitude: null,
-      }));
-    } catch (error) {
+      const content = chatCompletion.choices[0]?.message?.content || '[]';
+      
+      // Clean up markdown code blocks if Groq adds them
+      const jsonString = content.replace(/```json/g, '').replace(/```/g, '').trim();
+      
+      return JSON.parse(jsonString);
+    } catch (error: any) {
       console.error('AI Generation Error:', error);
       throw new Error('Failed to generate itinerary using AI');
     }
