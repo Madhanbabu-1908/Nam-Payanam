@@ -10,16 +10,23 @@ import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
 
+// ✅ CRITICAL FIX: Trust the first proxy (Render) to fix X-Forwarded-For warning
+app.set('trust proxy', 1);
+
 // 1. Security Middleware
 app.use(helmet());
 
 // 2. CORS Configuration
-// Update the origin with your actual frontend URL when deployed
-// Update the cors line in app.ts
+// Allows requests from your Vercel frontend and localhost
 app.use(cors({
-  origin: '*', // Allow all origins for testing
+  origin: [
+    'http://localhost:3000', 
+    'https://nam-payanam.vercel.app', // Ensure this matches your actual Vercel URL
+    '*' // Temporary wildcard for debugging if needed (remove in strict production)
+  ],
   credentials: true,
 }));
+
 // 3. Request Logging
 if (env.NODE_ENV !== 'production') {
   app.use(morgan('dev'));
@@ -28,10 +35,10 @@ if (env.NODE_ENV !== 'production') {
 }
 
 // 4. Body Parsing
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '10mb' })); // Increased limit for larger JSON payloads (e.g., AI responses)
 app.use(express.urlencoded({ extended: true }));
 
-// 5. Rate Limiting
+// 5. Rate Limiting (Prevent DDoS/Brute Force)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // Limit each IP to 100 requests per windowMs
@@ -41,12 +48,21 @@ const limiter = rateLimit({
 });
 app.use('/api', limiter);
 
-// ❌ REMOVED: Standalone /health route (Moved to routes/index.ts)
+// 6. Health Check Endpoint
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    message: 'Nam-Payanam Backend is running 🚀',
+    timestamp: new Date().toISOString(),
+    environment: env.NODE_ENV
+  });
+});
 
-// 6. API Routes (All routes here will be prefixed with /api)
+// 7. API Routes
+// All routes are prefixed with /api
 app.use('/api', routes);
 
-// 7. 404 Handler
+// 8. 404 Handler (If no route matches)
 app.use((req, res) => {
   res.status(404).json({
     success: false,
@@ -55,7 +71,8 @@ app.use((req, res) => {
   });
 });
 
-// 8. Global Error Handler
+// 9. Global Error Handler
+// Catches all errors from controllers (including AI errors) and middleware
 app.use(errorHandler);
 
 export default app;
