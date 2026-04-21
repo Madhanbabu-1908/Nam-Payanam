@@ -8,53 +8,95 @@ import { ArrowLeft, Navigation, Clock } from 'lucide-react';
 
 // Fix Leaflet Default Icon Issue
 const busIcon = new L.Icon({
-  iconUrl: 'https://cdn-icons-png.flaticon.com/512/30This is the **ultimate upgrade**. We are moving from a "Planning Tool" to a **Real-Time Operations Platform**.
+  iconUrl: 'https://cdn-icons-png.flaticon.com/512/3097/3097180.png', // Bus Icon
+  iconSize: [40, 40],
+  iconAnchor: [20, 20],
+});
 
-To achieve **Rapido/RedBus-style tracking**, we need three components:
-1.  **🗺️ Interactive Live Map**: Visualizing the route and vehicle movement (using Leaflet + OpenStreetMap).
-2.  **📍 Real-Time Location Stream**: Simulating GPS updates from a driver's device to the server.
-3.  **⚡ WebSocket/Polling**: Pushing coordinates to users instantly so the bus icon moves smoothly.
+export default function LiveMapPage() {
+  const { tripId } = useParams();
+  const navigate = useNavigate();
+  const [location, setLocation] = useState<{lat: number, lng: number} | null>(null);
+  const [history, setHistory] = useState<[number, number][]>([]);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-*Note: For a production app, you would use a native mobile app for the driver to send real GPS. Here, we will build a **"Driver Simulator"** in the web app to demonstrate the technology.*
+  useEffect(() => {
+    if (!tripId) return;
 
----
+    const fetchLocation = async () => {
+      try {
+        const res = await api.get(`/tracking/live/${tripId}`);
+        if (res.data.success && res.data.data) {
+          const { latitude, longitude } = res.data.data;
+          setLocation({ lat: latitude, lng: longitude });
+          setHistory(prev => [...prev.slice(-50), [latitude, longitude]]); // Keep last 50 points
+          setLastUpdated(new Date());
+        }
+      } catch (e) { console.error(e); }
+    };
 
-### 🚀 Phase 1: Database Schema (Supabase)
+    fetchLocation();
+    const interval = setInterval(fetchLocation, 5000); // Poll every 5 seconds
+    return () => clearInterval(interval);
+  }, [tripId]);
 
-Run this SQL in your **Supabase SQL Editor** to create the tracking tables.
+  const center = location || { lat: 11.0168, lng: 76.9558 }; // Default to Coimbatore if no loc
 
-```sql
--- 1. Create Tracking Tokens (Secure links for drivers)
-CREATE TABLE tracking_tokens (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  trip_id UUID REFERENCES trips(id) ON DELETE CASCADE NOT NULL,
-  token TEXT UNIQUE NOT NULL,
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+  return (
+    <div className="h-screen flex flex-col relative">
+      {/* Header Overlay */}
+      <div className="absolute top-0 left-0 right-0 z-[1000] p-4 bg-gradient-to-b from-white/90 to-transparent pointer-events-none">
+        <div className="flex items-center gap-3 pointer-events-auto">
+          <button onClick={() => navigate(-1)} className="p-2 bg-white rounded-full shadow-lg hover:bg-gray-50"><ArrowLeft/></button>          <div className="bg-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            <span className="font-bold text-sm text-gray-800">Live Tracking</span>
+          </div>
+        </div>
+      </div>
 
--- 2. Create Live Location Logs
-CREATE TABLE location_logs (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  trip_id UUID REFERENCES trips(id) ON DELETE CASCADE NOT NULL,
-  latitude NUMERIC NOT NULL,
-  longitude NUMERIC NOT NULL,
-  speed NUMERIC DEFAULT 0,
-  timestamp TIMESTAMPTZ DEFAULT NOW()
-);
+      {/* Map */}
+      <MapContainer center={[center.lat, center.lng]} zoom={13} className="w-full h-full" scrollWheelZoom={true}>
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        
+        {/* Path History */}
+        {history.length > 1 && (
+          <Polyline positions={history} color="#4f46e5" weight={4} opacity={0.7} dashArray="5, 10" />
+        )}
 
--- Enable RLS
-ALTER TABLE tracking_tokens ENABLE ROW LEVEL SECURITY;
-ALTER TABLE location_logs ENABLE ROW LEVEL SECURITY;
+        {/* Live Bus Marker */}
+        {location && (
+          <Marker position={[location.lat, location.lng]} icon={busIcon}>
+            <Popup>
+              <div className="text-center">
+                <p className="font-bold">Your Bus is Here! 🚌</p>
+                <p className="text-xs text-gray-500">Updated: {lastUpdated?.toLocaleTimeString()}</p>
+              </div>
+            </Popup>
+          </Marker>
+        )}
+      </MapContainer>
 
--- Policies
-CREATE POLICY "Public can view active tokens" ON tracking_tokens FOR SELECT USING (is_active = true);
-CREATE POLICY "Members can view logs" ON location_logs FOR SELECT USING (
-  trip_id IN (SELECT trip_id FROM trip_members WHERE user_id = auth.uid())
-);
-CREATE POLICY "Token holders can insert logs" ON location_logs FOR INSERT WITH CHECK (
-  EXISTS (SELECT 1 FROM tracking_tokens WHERE token = current_setting('app.current_token', true)::text AND trip_id = location_logs.trip_id)
-);
-
--- Index for fast latest location lookup
-CREATE INDEX idx_location_logs_trip_time ON location_logs(trip_id, timestamp DESC);
+      {/* Bottom Info Card */}
+      {location && (
+        <div className="absolute bottom-6 left-4 right-4 bg-white rounded-2xl shadow-xl p-4 z-[1000] animate-fade-in border border-gray-100">
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="text-xs text-gray-500 uppercase font-bold">Estimated Arrival</p>
+              <p className="text-xl font-bold text-indigo-600">15 mins</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-gray-500 uppercase font-bold">Speed</p>
+              <p className="text-xl font-bold text-gray-800">45 <span className="text-sm font-normal">km/h</span></p>
+            </div>
+          </div>
+          <div className="mt-3 w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+            <div className="bg-indigo-600 h-full w-2/3 animate-pulse"></div>
+          </div>
+          <p className="text-xs text-center mt-2 text-gray-400">Vehicle is on track</p>
+        </div>      )}
+    </div>
+  );
+}
