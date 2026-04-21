@@ -10,7 +10,7 @@ export const expenseController = {
       const userId = req.user!.id;
 
       // 1. Verify user is a member of this trip
-      const { data: memberCheck } = await supabaseAdmin
+      const {  memberCheck } = await supabaseAdmin
         .from('trip_members')
         .select('id')
         .eq('trip_id', tripId)
@@ -22,7 +22,7 @@ export const expenseController = {
       }
 
       // 2. Get all members to split equally
-      const { data: members } = await supabaseAdmin
+      const {  members } = await supabaseAdmin
         .from('trip_members')
         .select('user_id')
         .eq('trip_id', tripId);
@@ -32,7 +32,7 @@ export const expenseController = {
       const splitAmount = amount / members.length;
 
       // 3. Insert Expense
-      const { data: expense, error: expError } = await supabaseAdmin
+      const {  expense, error: expError } = await supabaseAdmin
         .from('expenses')
         .insert({
           trip_id: tripId,
@@ -99,7 +99,7 @@ export const expenseController = {
         `)        .eq('expense.trip_id', tripId); // Note: Requires joining through expense table
 
       // Simplified fallback: Just return all splits for this trip's expenses
-      const { data: expenses } = await supabaseAdmin
+      const {  expenses } = await supabaseAdmin
         .from('expenses')
         .select('id, paid_by_user_id')
         .eq('trip_id', tripId);
@@ -107,7 +107,7 @@ export const expenseController = {
       if (!expenses) return res.json({ success: true, data: [] });
 
       const expenseIds = expenses.map(e => e.id);
-      const { data: splits } = await supabaseAdmin
+      const {  splits } = await supabaseAdmin
         .from('expense_splits')
         .select('*')
         .in('expense_id', expenseIds);
