@@ -2,35 +2,42 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Ensure Leaflet maps have height */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+
 body {
   margin: 0;
-  font-family: 'DM Sans', sans-serif; /* Ensure you imported this in index.html */
+  font-family: 'DM Sans', sans-serif;
   background: #f8fafc;
   color: #1e293b;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Glassmorphism Utility */
+/* Dark mode support for body */
+.dark body {
+  background: #0f172a;
+  color: #f1f5f9;
+}
+
 .glass {
   background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
-/* Smooth Scroll */
-html { scroll-behavior: smooth; }
+.dark .glass {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
 
-/* Custom Animations */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-.animate-fade-in {
-  animation: fadeIn 0.4s ease-out forwards;
-}
-
-/* Hide Scrollbar but keep functionality */
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
