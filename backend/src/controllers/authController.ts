@@ -7,12 +7,13 @@ export const authController = {
   getProfile: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       // User info is already attached to req.user by middleware
+      // We only return fields we are sure exist: id and email
       res.json({
         success: true,
         data: {
           id: req.user?.id,
-          email: req.user?.email,
-          created_at: req.user?.created_at
+          email: req.user?.email
+          // created_at removed to fix TS error as it's not always directly on the JWT payload
         }
       });
     } catch (error: any) {
