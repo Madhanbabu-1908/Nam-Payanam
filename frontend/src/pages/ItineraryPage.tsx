@@ -23,7 +23,7 @@ export default function ItineraryPage() {
     if (!tripId) return;
     Promise.all([
       api.get(`/trips/${tripId}`),
-      api.get(`/itinerary/trip/${tripId}`).catch(() => ({ data: { success: true, data: [] } }))
+      api.get(`/itinerary/trip/${tripId}`).catch(() => ({  { success: true,  [] } }))
     ]).then(([tripRes, itemRes]) => {
       setTrip(tripRes.data.data);
       setItems(itemRes.data.data || []);
@@ -39,6 +39,7 @@ export default function ItineraryPage() {
 
   if (loading) return <div className="h-screen flex items-center justify-center"><div className="animate-spin h-8 w-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full"></div></div>;
 
+  // ✅ FIX: Explicitly type the grouped object
   const grouped = items.reduce((acc, item) => {
     const day = item.day_number || 1;
     if (!acc[day]) acc[day] = [];
@@ -46,8 +47,8 @@ export default function ItineraryPage() {
     return acc;
   }, {} as Record<number, any[]>);
 
-  return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-20">      <header className="glass sticky top-0 z-20 px-6 py-4 flex items-center justify-between backdrop-blur-md bg-white/80 dark:bg-slate-800/80 border-b border-slate-200/50 dark:border-slate-700">
+  return (    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-20">
+      <header className="glass sticky top-0 z-20 px-6 py-4 flex items-center justify-between backdrop-blur-md bg-white/80 dark:bg-slate-800/80 border-b border-slate-200/50 dark:border-slate-700">
         <div className="flex items-center gap-3">
           <button onClick={() => navigate(-1)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full"><ArrowLeft/></button>
           <h1 className="font-bold text-lg text-slate-800 dark:text-white">Itinerary</h1>
@@ -76,7 +77,8 @@ export default function ItineraryPage() {
               <p>No itinerary items yet.</p>
             </div>
           ) : (
-            Object.entries(grouped).map(([day, dayItems]: [string, any[]]) => (
+            // ✅ FIX: Cast entries to correct type
+            Object.entries(grouped).map(([day, dayItems]) => (
               <div key={day} className="animate-fade-in">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="bg-indigo-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shadow-md">
@@ -94,9 +96,9 @@ export default function ItineraryPage() {
                         <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded flex items-center gap-1">
                           {getIcon(item.time_slot)} {item.time_slot}
                         </span>
-                        {item.estimated_cost && <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">₹{item.estimated_cost}</span>}
-                      </div>
-                      <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">                        <MapPin size={16} className="text-slate-400"/> {item.location_name}
+                        {item.estimated_cost && <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">₹{item.estimated_cost}</span>}                      </div>
+                      <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                        <MapPin size={16} className="text-slate-400"/> {item.location_name}
                       </h3>
                       <p className="text-slate-600 dark:text-slate-300 text-sm mt-1 leading-relaxed">{item.description}</p>
                     </div>
