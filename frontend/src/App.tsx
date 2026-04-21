@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
-// Import Pages
+// Pages
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Home from './pages/Home';
@@ -12,7 +12,9 @@ import ItineraryPage from './pages/ItineraryPage';
 import ExpensesPage from './pages/ExpensesPage';
 import MembersPage from './pages/MembersPage';
 import SettingsPage from './pages/SettingsPage';
-import ProfilePage from './pages/ProfilePage'; // ✅ New Import
+import ProfilePage from './pages/ProfilePage';
+import SettlementsPage from './pages/SettlementsPage'; // ✅ New
+import CheckinPage from './pages/CheckinPage';       // ✅ New
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -20,10 +22,10 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   
   if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center text-gray-500 bg-gray-50">
+      <div className="h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p>Loading Nam-Payanam...</p>
+          <p className="text-slate-500 dark:text-slate-400 font-medium">Loading Nam-Payanam...</p>
         </div>
       </div>
     );
@@ -36,7 +38,6 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   return <>{children}</>;
 };
 
-// Main App Routes
 function AppRoutes() {
   return (
     <Routes>
@@ -53,6 +54,8 @@ function AppRoutes() {
       <Route path="/dashboard/:tripId" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/dashboard/:tripId/itinerary" element={<ProtectedRoute><ItineraryPage /></ProtectedRoute>} />
       <Route path="/dashboard/:tripId/expenses" element={<ProtectedRoute><ExpensesPage /></ProtectedRoute>} />
+      <Route path="/dashboard/:tripId/settlements" element={<ProtectedRoute><SettlementsPage /></ProtectedRoute>} /> {/* ✅ New */}
+      <Route path="/dashboard/:tripId/checkin" element={<ProtectedRoute><CheckinPage /></ProtectedRoute>} />       {/* ✅ New */}
       <Route path="/dashboard/:tripId/members" element={<ProtectedRoute><MembersPage /></ProtectedRoute>} />
       <Route path="/dashboard/:tripId/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
       
@@ -62,7 +65,6 @@ function AppRoutes() {
   );
 }
 
-// Main App Component
 export default function App() {
   return (
     <AuthProvider>
