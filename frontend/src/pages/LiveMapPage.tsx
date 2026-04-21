@@ -4,7 +4,7 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { api } from '../config/api';
-import { ArrowLeft, Navigation, Clock } from 'lucide-react';
+import { ArrowLeft, Navigation } from 'lucide-react';
 
 // Fix Leaflet Default Icon Issue
 const busIcon = new L.Icon({
@@ -18,10 +18,11 @@ export default function LiveMapPage() {
   const { tripId } = useParams();
   const navigate = useNavigate();
   const [location, setLocation] = useState<{lat: number, lng: number} | null>(null);
+  
+  // ✅ FIX: Explicitly type the state as [number, number][]
   const [history, setHistory] = useState<[number, number][]>([]);
+  
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-
-  // Default center (e.g., Coimbatore/Ooty region)
   const defaultCenter: [number, number] = [11.0168, 76.9558];
 
   useEffect(() => {
@@ -35,19 +36,23 @@ export default function LiveMapPage() {
           const newLoc = { lat: latitude, lng: longitude };
           
           setLocation(newLoc);
+          
+          // ✅ FIX: Cast the new point explicitly to [number, number]
           setHistory(prev => {
-            const newHistory = [...prev, [latitude, longitude]];
-            return newHistory.slice(-50); // Keep last 50 points
+            const newPoint: [number, number] = [latitude, longitude];
+            const newHistory = [...prev, newPoint];
+            return newHistory.slice(-50);
           });
+          
           setLastUpdated(new Date());
         }
       } catch (e) { 
-        console.error("Error fetching live location:", e); 
-      }
+        console.error("Error fetching live location:", e);       }
     };
 
     fetchLocation();
-    const interval = setInterval(fetchLocation, 5000); // Poll every 5s    return () => clearInterval(interval);
+    const interval = setInterval(fetchLocation, 5000);
+    return () => clearInterval(interval);
   }, [tripId]);
 
   const currentCenter: [number, number] = location 
@@ -72,31 +77,29 @@ export default function LiveMapPage() {
         </div>
       </div>
 
-      {/* Map Container - MUST HAVE HEIGHT */}
+      {/* Map Container */}
       <div className="w-full h-full z-0">
         <MapContainer 
           center={currentCenter} 
           zoom={13} 
           className="w-full h-full outline-none" 
           scrollWheelZoom={true}
-          zoomControl={false} // Hide default zoom controls for cleaner UI
+          zoomControl={false}
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           
-          {/* Path History */}
           {history.length > 1 && (
             <Polyline positions={history} color="#4f46e5" weight={4} opacity={0.7} dashArray="5, 10" />
           )}
 
-          {/* Live Bus Marker */}
           {location && (
-            <Marker position={[location.lat, location.lng]} icon={busIcon}>
-              <Popup>
+            <Marker position={[location.lat, location.lng]} icon={busIcon}>              <Popup>
                 <div className="text-center min-w-[150px]">
-                  <p className="font-bold text-indigo-600">Your Bus 🚌</p>                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="font-bold text-indigo-600">Your Bus 🚌</p>
+                  <p className="text-xs text-gray-500 mt-1">
                     Updated: {lastUpdated?.toLocaleTimeString()}
                   </p>
                 </div>
@@ -124,7 +127,6 @@ export default function LiveMapPage() {
           <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
             <div className="bg-indigo-600 h-full w-2/3 animate-pulse"></div>
           </div>
-          <p className="text-xs text-center mt-2 text-slate-400">Vehicle is moving towards destination</p>
         </div>
       )}
     </div>
