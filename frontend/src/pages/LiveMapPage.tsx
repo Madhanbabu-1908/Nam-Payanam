@@ -8,9 +8,10 @@ import { ArrowLeft, Navigation, Clock } from 'lucide-react';
 
 // Fix Leaflet Default Icon Issue
 const busIcon = new L.Icon({
-  iconUrl: 'https://cdn-icons-png.flaticon.com/512/3097/3097180.png', // Bus Icon
+  iconUrl: 'https://cdn-icons-png.flaticon.com/512/3097/3097180.png',
   iconSize: [40, 40],
   iconAnchor: [20, 20],
+  popupAnchor: [0, -20]
 });
 
 export default function LiveMapPage() {
@@ -20,6 +21,9 @@ export default function LiveMapPage() {
   const [history, setHistory] = useState<[number, number][]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
+  // Default center (e.g., Coimbatore/Ooty region)
+  const defaultCenter: [number, number] = [11.0168, 76.9558];
+
   useEffect(() => {
     if (!tripId) return;
 
@@ -28,75 +32,101 @@ export default function LiveMapPage() {
         const res = await api.get(`/tracking/live/${tripId}`);
         if (res.data.success && res.data.data) {
           const { latitude, longitude } = res.data.data;
-          setLocation({ lat: latitude, lng: longitude });
-          setHistory(prev => [...prev.slice(-50), [latitude, longitude]]); // Keep last 50 points
+          const newLoc = { lat: latitude, lng: longitude };
+          
+          setLocation(newLoc);
+          setHistory(prev => {
+            const newHistory = [...prev, [latitude, longitude]];
+            return newHistory.slice(-50); // Keep last 50 points
+          });
           setLastUpdated(new Date());
         }
-      } catch (e) { console.error(e); }
+      } catch (e) { 
+        console.error("Error fetching live location:", e); 
+      }
     };
 
     fetchLocation();
-    const interval = setInterval(fetchLocation, 5000); // Poll every 5 seconds
-    return () => clearInterval(interval);
+    const interval = setInterval(fetchLocation, 5000); // Poll every 5s    return () => clearInterval(interval);
   }, [tripId]);
 
-  const center = location || { lat: 11.0168, lng: 76.9558 }; // Default to Coimbatore if no loc
+  const currentCenter: [number, number] = location 
+    ? [location.lat, location.lng] 
+    : defaultCenter;
 
   return (
-    <div className="h-screen flex flex-col relative">
+    <div className="relative w-full h-screen bg-slate-100">
       {/* Header Overlay */}
-      <div className="absolute top-0 left-0 right-0 z-[1000] p-4 bg-gradient-to-b from-white/90 to-transparent pointer-events-none">
+      <div className="absolute top-0 left-0 right-0 z-[1000] p-4 pointer-events-none">
         <div className="flex items-center gap-3 pointer-events-auto">
-          <button onClick={() => navigate(-1)} className="p-2 bg-white rounded-full shadow-lg hover:bg-gray-50"><ArrowLeft/></button>          <div className="bg-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
+          <button 
+            onClick={() => navigate(-1)} 
+            className="p-3 bg-white dark:bg-slate-800 rounded-full shadow-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition text-slate-800 dark:text-white"
+          >
+            <ArrowLeft size={20}/>
+          </button>
+          <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-md px-4 py-2 rounded-full shadow-lg flex items-center gap-2 border border-slate-200 dark:border-slate-700">
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-            <span className="font-bold text-sm text-gray-800">Live Tracking</span>
+            <span className="font-bold text-sm text-slate-800 dark:text-white">Live Tracking</span>
           </div>
         </div>
       </div>
 
-      {/* Map */}
-      <MapContainer center={[center.lat, center.lng]} zoom={13} className="w-full h-full" scrollWheelZoom={true}>
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-        
-        {/* Path History */}
-        {history.length > 1 && (
-          <Polyline positions={history} color="#4f46e5" weight={4} opacity={0.7} dashArray="5, 10" />
-        )}
+      {/* Map Container - MUST HAVE HEIGHT */}
+      <div className="w-full h-full z-0">
+        <MapContainer 
+          center={currentCenter} 
+          zoom={13} 
+          className="w-full h-full outline-none" 
+          scrollWheelZoom={true}
+          zoomControl={false} // Hide default zoom controls for cleaner UI
+        >
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+          
+          {/* Path History */}
+          {history.length > 1 && (
+            <Polyline positions={history} color="#4f46e5" weight={4} opacity={0.7} dashArray="5, 10" />
+          )}
 
-        {/* Live Bus Marker */}
-        {location && (
-          <Marker position={[location.lat, location.lng]} icon={busIcon}>
-            <Popup>
-              <div className="text-center">
-                <p className="font-bold">Your Bus is Here! 🚌</p>
-                <p className="text-xs text-gray-500">Updated: {lastUpdated?.toLocaleTimeString()}</p>
-              </div>
-            </Popup>
-          </Marker>
-        )}
-      </MapContainer>
+          {/* Live Bus Marker */}
+          {location && (
+            <Marker position={[location.lat, location.lng]} icon={busIcon}>
+              <Popup>
+                <div className="text-center min-w-[150px]">
+                  <p className="font-bold text-indigo-600">Your Bus 🚌</p>                  <p className="text-xs text-gray-500 mt-1">
+                    Updated: {lastUpdated?.toLocaleTimeString()}
+                  </p>
+                </div>
+              </Popup>
+            </Marker>
+          )}
+        </MapContainer>
+      </div>
 
       {/* Bottom Info Card */}
       {location && (
-        <div className="absolute bottom-6 left-4 right-4 bg-white rounded-2xl shadow-xl p-4 z-[1000] animate-fade-in border border-gray-100">
-          <div className="flex justify-between items-center">
+        <div className="absolute bottom-6 left-4 right-4 bg-white/90 dark:bg-slate-800/90 backdrop-blur-md rounded-2xl shadow-xl p-4 z-[1000] animate-fade-in border border-slate-200 dark:border-slate-700 max-w-md mx-auto">
+          <div className="flex justify-between items-center mb-2">
             <div>
-              <p className="text-xs text-gray-500 uppercase font-bold">Estimated Arrival</p>
-              <p className="text-xl font-bold text-indigo-600">15 mins</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider">Status</p>
+              <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
+                <Navigation size={18}/> On Route
+              </p>
             </div>
             <div className="text-right">
-              <p className="text-xs text-gray-500 uppercase font-bold">Speed</p>
-              <p className="text-xl font-bold text-gray-800">45 <span className="text-sm font-normal">km/h</span></p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider">Speed</p>
+              <p className="text-lg font-bold text-slate-800 dark:text-white">45 <span className="text-sm font-normal text-slate-500">km/h</span></p>
             </div>
           </div>
-          <div className="mt-3 w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+          <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
             <div className="bg-indigo-600 h-full w-2/3 animate-pulse"></div>
           </div>
-          <p className="text-xs text-center mt-2 text-gray-400">Vehicle is on track</p>
-        </div>      )}
+          <p className="text-xs text-center mt-2 text-slate-400">Vehicle is moving towards destination</p>
+        </div>
+      )}
     </div>
   );
 }
