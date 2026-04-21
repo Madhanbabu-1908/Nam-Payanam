@@ -47,7 +47,7 @@ export const aiService = {
           }
         ],
         // ✅ UPDATED MODEL ID HERE
-        model: 'llama-3.1-70b-versatile', 
+        model: 'openai/gpt-oss-120b', 
         temperature: 0.7,
         max_tokens: 4096,
         top_p: 1,
