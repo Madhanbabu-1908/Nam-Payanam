@@ -5,6 +5,52 @@ import { aiService } from '../services/aiService';
 import { supabaseAdmin } from '../config/db';
 
 export const tripController = {
+  // ✅ NEW: Fetch trips for the logged-in user
+  getMyTrips: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const userId = req.user!.id;
+
+      // 1. Get all trip IDs where user is a member
+      const { data: membersData, error: memberError } = await supabaseAdmin
+        .from('trip_members')
+        .select('trip_id')
+        .eq('user_id', userId);
+
+      if (memberError) throw memberError;
+
+      const memberTripIds = membersData?.map(m => m.trip_id) || [];
+
+      // 2. Get all trip IDs where user is the organizer
+      const { data: ownedData, error: ownerError } = await supabaseAdmin
+        .from('trips')
+        .select('id')
+        .eq('organizer_id', userId);
+
+      if (ownerError) throw ownerError;
+
+      const ownedTripIds = ownedData?.map(t => t.id) || [];
+
+      // 3. Combine and remove duplicates
+      const allTripIds = [...new Set([...memberTripIds, ...ownedTripIds])];
+
+      if (allTripIds.length === 0) {
+        return res.json({ success: true, data: [] });
+      }
+
+      // 4. Fetch full trip details
+      const { data: trips, error: tripsError } = await supabaseAdmin
+        .from('trips')
+        .select('*')
+        .in('id', allTripIds)
+        .order('created_at', { ascending: false });
+
+      if (tripsError) throw tripsError;
+
+      res.json({ success: true, data: trips });
+    } catch (error: any) {      next(error);
+    }
+  },
+
   createTrip: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { name, destination, start_date, end_date, budget, mode, interests, start_location } = req.body;
@@ -26,12 +72,14 @@ export const tripController = {
         status: 'PLANNING',
       });
 
+      // Add user as ORGANIZER to trip_members
       await supabaseAdmin.from('trip_members').insert({
         trip_id: newTrip.id,
         user_id: userId,
         role: 'ORGANIZER'
       });
 
+      // AI Generation Logic
       if (mode === 'AI' && interests && start_location) {
         const days = Math.ceil((new Date(end_date).getTime() - new Date(start_date).getTime()) / (1000 * 60 * 60 * 24)) + 1;
         
@@ -49,7 +97,6 @@ export const tripController = {
           await supabaseAdmin.from('itinerary_items').insert(itemsToInsert);
         }
       }
-
       res.status(201).json({ success: true, data: newTrip });
     } catch (error: any) {
       next(error);
