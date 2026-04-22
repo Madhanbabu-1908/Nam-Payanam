@@ -94,8 +94,13 @@ body {
 .input {
   @apply w-full bg-[var(--bg)] border border-[var(--border)] rounded-xl
          px-4 py-3 text-sm text-[var(--text)] placeholder-[var(--muted)]
-         focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30
+         focus:outline-none focus:ring-2
          focus:border-[var(--brand)] transition-all duration-150;
+}
+
+.input:focus {
+  --tw-ring-color: var(--brand);
+  --tw-ring-opacity: 0.3;
 }
 .label { @apply text-xs font-bold text-[var(--muted)] uppercase tracking-wider mb-1.5 block; }
 
