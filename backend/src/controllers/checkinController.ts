@@ -12,17 +12,13 @@ export const checkinController = {
         return res.status(400).json({ success: false, error: 'Trip ID and Location required' });
       }
 
-      const { data, error } = await supabaseAdmin
-        .from('checkins')
-        .insert({
-          trip_id: tripId,
-          user_id: userId,
-          location_name: locationName,
-          status,
-          checked_in_at: new Date().toISOString()
-        })
-        .select()
-        .single();
+      const { data, error } = await supabaseAdmin.from('checkins').insert({
+        trip_id: tripId,
+        user_id: userId,
+        location_name: locationName,
+        status,
+        checked_in_at: new Date().toISOString()
+      }).select().single();
 
       if (error) throw error;
       res.json({ success: true, data });
@@ -35,10 +31,13 @@ export const checkinController = {
     try {
       const { tripId } = req.params;
 
-      // Get latest checkin per user
+      // Get latest checkin per user, joining user email/name
       const { data, error } = await supabaseAdmin
         .from('checkins')
-        .select(`*, user:user_id (email, full_name)`)
+        .select(`
+          *,
+          user:user_id (email, full_name)
+        `)
         .eq('trip_id', tripId)
         .order('checked_in_at', { ascending: false });
 
@@ -47,7 +46,7 @@ export const checkinController = {
       // Deduplicate to get only the latest status per user
       const latestCheckins: any[] = [];
       const seenUsers = new Set();
-
+      
       data?.forEach((item: any) => {
         if (!seenUsers.has(item.user_id)) {
           latestCheckins.push(item);
