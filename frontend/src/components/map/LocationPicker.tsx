@@ -19,15 +19,49 @@ interface LocationPickerProps {
   label: string;
 }
 
-// Component to handle Map Clicks
+// Component to handle Map Clicks + Reverse Geocoding
 function LocationMarker({ onSelect }: { onSelect: (lat: number, lng: number, name: string) => void }) {
   const [position, setPosition] = useState<L.LatLng | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const map = useMapEvents({
-    click(e) {
+    async click(e) {
       setPosition(e.latlng);
-      // Reverse geocoding could go here, but for now we just pass coords
-      onSelect(e.latlng.lat, e.latlng.lng, `${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`);
+      setLoading(true);
+
+      try {
+        // Reverse geocode using Nominatim
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${e.latlng.lat}&lon=${e.latlng.lng}&zoom=10&addressdetails=1`,
+          {
+            headers: {
+              'User-Agent': 'Nam-Payanam-App/1.0'
+            }
+          }
+        );
+        const data = await res.json();
+
+        let displayName = `${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
+
+        if (data && data.address) {
+          const addr = data.address;
+          // Try to get most relevant name: city > town > village > county
+          displayName = 
+            addr.city ||             addr.town || 
+            addr.village || 
+            addr.county || 
+            addr.state_district || 
+            addr.state || 
+            displayName;
+        }
+
+        onSelect(e.latlng.lat, e.latlng.lng, displayName);
+      } catch (err) {
+        console.error("Reverse geocoding failed:", err);
+        onSelect(e.latlng.lat, e.latlng.lng, `${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`);
+      } finally {
+        setLoading(false);
+      }
     },
     locationfound(e) {
       setPosition(e.latlng);
@@ -36,7 +70,13 @@ function LocationMarker({ onSelect }: { onSelect: (lat: number, lng: number, nam
   });
 
   return position === null ? null : (
-    <Marker position={position} icon={defaultIcon}></Marker>
+    <Marker position={position} icon={defaultIcon}>
+      {loading && (
+        <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-white dark:bg-slate-800 px-3 py-1 rounded-full text-xs font-bold shadow-md animate-pulse">
+          Fetching location...
+        </div>
+      )}
+    </Marker>
   );
 }
 
@@ -47,7 +87,8 @@ export default function LocationPicker({ onSelect, initialLat, initialLng, label
 
   // Handle Search via Nominatim API
   const handleSearch = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const query = e.target.value;    setSearchQuery(query);
+    const query = e.target.value;
+    setSearchQuery(query);
 
     if (query.length < 3) {
       setSuggestions([]);
@@ -55,8 +96,7 @@ export default function LocationPicker({ onSelect, initialLat, initialLng, label
     }
 
     try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=5&addressdetails=1`);
-      const data = await res.json();
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=5&addressdetails=1`);      const data = await res.json();
       setSuggestions(data);
     } catch (err) {
       console.error(err);
@@ -96,7 +136,8 @@ export default function LocationPicker({ onSelect, initialLat, initialLng, label
           <div className="bg-white dark:bg-slate-800 mt-2 rounded-xl shadow-lg max-h-60 overflow-y-auto">
             {suggestions.map((item, idx) => (
               <button 
-                key={idx}                 onClick={() => selectSuggestion(item)}
+                key={idx} 
+                onClick={() => selectSuggestion(item)}
                 className="w-full text-left p-3 hover:bg-slate-50 dark:hover:bg-slate-700 border-b border-slate-100 dark:border-slate-700 last:border-0"
               >
                 <p className="font-bold text-sm text-slate-800 dark:text-white">{item.display_name.split(',')[0]}</p>
@@ -104,8 +145,7 @@ export default function LocationPicker({ onSelect, initialLat, initialLng, label
               </button>
             ))}
           </div>
-        )}
-      </div>
+        )}      </div>
 
       {/* The Map */}
       <MapContainer center={center} zoom={5} className="w-full h-full z-0">
