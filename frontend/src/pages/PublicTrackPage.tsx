@@ -1,172 +1,208 @@
 import { useEffect, useRef, useState } from "react";
-import Map, { Source, Layer, Marker } from "react-map-gl/maplibre";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 
-interface RouteGeoJSON {
-  type: "Feature";
-  geometry: {
+type Trip = {
+  id: string;
+  route?: {
     type: "LineString";
     coordinates: [number, number][];
   };
-}
+};
 
-export default function PublicTrackPage({ trip }: any) {
-  const mapRef = useRef<any>(null);
+type Location = {
+  lng: number;
+  lat: number;
+};
 
-  const [routeGeoJSON, setRouteGeoJSON] = useState<RouteGeoJSON | null>(null);
-  const [vehiclePosition, setVehiclePosition] = useState<[number, number] | null>(null);
+export default function PublicTrackPage() {
+  const mapContainer = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<maplibregl.Map | null>(null);
+  const vehicleMarker = useRef<maplibregl.Marker | null>(null);
+
+  const [trip, setTrip] = useState<Trip | null>(null);
   const [distance, setDistance] = useState<number>(0);
   const [eta, setEta] = useState<number>(0);
 
-  // 🗺️ Convert route
+  const tripId = window.location.pathname.split("/").pop();
+
+  // ✅ Single ENV
+  const API_URL = import.meta.env.VITE_API_URL;
+  const WS_URL = API_URL.replace(/^http/, "ws");
+
+  // 🚀 Fetch Trip
   useEffect(() => {
-    if (trip?.route?.coordinates?.length > 1) {
-      const geojson: RouteGeoJSON = {
-        type: "Feature",
-        geometry: {
-          type: "LineString",
-          coordinates: trip.route.coordinates
-        }
-      };
-      setRouteGeoJSON(geojson);
+    if (!tripId) return;
 
-      // 🚀 Auto zoom to fit route
-      const bounds = new maplibregl.LngLatBounds();
-      trip.route.coordinates.forEach((coord: [number, number]) => {
-        bounds.extend(coord);
-      });
+    fetch(`${API_URL}/trips/${tripId}`)
+      .then(res => res.json())
+      .then(data => setTrip(data.data))
+      .catch(err => console.error("Fetch trip failed:", err));
+  }, [tripId]);
 
-      setTimeout(() => {
-        mapRef.current?.fitBounds(bounds, {
-          padding: 50,
-          duration: 1000
-        });
-      }, 500);
-
-      // 📏 Calculate distance
-      let total = 0;
-      for (let i = 1; i < trip.route.coordinates.length; i++) {
-        const [lng1, lat1] = trip.route.coordinates[i - 1];
-        const [lng2, lat2] = trip.route.coordinates[i];
-        total += getDistance(lat1, lng1, lat2, lng2);
-      }
-      setDistance(total);
-
-      // ⏱️ ETA (assuming 40 km/h avg)
-      setEta(total / 40);
-    }
-  }, [trip]);
-
-  // 🚗 Animation along route
+  // 🗺️ Initialize MapLibre
   useEffect(() => {
-    if (!routeGeoJSON) return;
+    if (!mapContainer.current) return;
 
-    let i = 0;
-    const coords = routeGeoJSON.geometry.coordinates;
+    mapRef.current = new maplibregl.Map({
+      container: mapContainer.current,
+      style: "https://demotiles.maplibre.org/style.json", // ✅ FREE STYLE
+      center: [78.9629, 20.5937],
+      zoom: 4,
+    });
 
-    const interval = setInterval(() => {
-      if (i < coords.length) {
-        setVehiclePosition(coords[i]);
-        i++;
-      } else {
-        clearInterval(interval);
-      }
-    }, 1000);
+    mapRef.current.addControl(new maplibregl.NavigationControl());
 
-    return () => clearInterval(interval);
-  }, [routeGeoJSON]);
-
-  // 🌐 WebSocket (Real-time tracking)
-  useEffect(() => {
-    const ws = new WebSocket("wss://your-backend-url/ws");
-
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-
-      // Expected: { lng, lat }
-      if (data?.lng && data?.lat) {
-        setVehiclePosition([data.lng, data.lat]);
-      }
-    };
-
-    return () => ws.close();
+    return () => mapRef.current?.remove();
   }, []);
 
-  // 📏 Distance calculator (Haversine)
-  function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+  // 🚀 Draw Route + Auto Fit
+  useEffect(() => {
+    if (!trip || !trip.route || !mapRef.current) return;
+
+    const map = mapRef.current;
+    const coords = trip.route.coordinates;
+
+    if (!map.getSource("route")) {
+      map.addSource("route", {
+        type: "geojson",
+        data: {
+          type: "Feature",
+          geometry: trip.route,
+        },
+      });
+
+      map.addLayer({
+        id: "route-line",
+        type: "line",
+        source: "route",
+        paint: {
+          "line-color": "#007bff",
+          "line-width": 4,
+        },
+      });
+    }
+
+    // ✅ Auto fit route
+    const bounds = new maplibregl.LngLatBounds();
+    coords.forEach(c => bounds.extend(c));
+    map.fitBounds(bounds, { padding: 50 });
+
+    // 📏 Calculate distance
+    let total = 0;
+    for (let i = 1; i < coords.length; i++) {
+      total += getDistance(coords[i - 1], coords[i]);
+    }
+    setDistance(total);
+
+    // ⏱ ETA (avg speed 40km/h)
+    setEta(total / 40);
+
+  }, [trip]);
+
+  // 🚗 WebSocket real-time tracking
+  useEffect(() => {
+    if (!mapRef.current || !tripId) return;
+
+    const socket = new WebSocket(`${WS_URL}/track/${tripId}`);
+
+    socket.onopen = () => {
+      console.log("✅ WebSocket connected");
+    };
+
+    socket.onmessage = (event) => {
+      const loc: Location = JSON.parse(event.data);
+      animateVehicle(loc);
+    };
+
+    socket.onerror = (err) => {
+      console.error("❌ WebSocket error:", err);
+    };
+
+    socket.onclose = () => {
+      console.log("🔌 WebSocket disconnected");
+    };
+
+    return () => socket.close();
+  }, [tripId]);
+
+  // 🚗 Smooth vehicle animation
+  const animateVehicle = (target: Location) => {
+    if (!mapRef.current) return;
+
+    if (!vehicleMarker.current) {
+      const el = document.createElement("div");
+      el.innerHTML = "🚗";
+      el.style.fontSize = "28px";
+
+      vehicleMarker.current = new maplibregl.Marker(el)
+        .setLngLat([target.lng, target.lat])
+        .addTo(mapRef.current);
+
+      return;
+    }
+
+    const start = vehicleMarker.current.getLngLat();
+    const duration = 1000;
+    const startTime = performance.now();
+
+    const animate = (time: number) => {
+      const progress = Math.min((time - startTime) / duration, 1);
+
+      const lng = start.lng + (target.lng - start.lng) * progress;
+      const lat = start.lat + (target.lat - start.lat) * progress;
+
+      vehicleMarker.current!.setLngLat([lng, lat]);
+
+      if (progress < 1) requestAnimationFrame(animate);
+    };
+
+    requestAnimationFrame(animate);
+  };
+
+  // 📏 Distance (Haversine)
+  const getDistance = (a: [number, number], b: [number, number]) => {
     const R = 6371;
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const dLat = (b[1] - a[1]) * Math.PI / 180;
+    const dLng = (b[0] - a[0]) * Math.PI / 180;
 
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
+    const lat1 = a[1] * Math.PI / 180;
+    const lat2 = b[1] * Math.PI / 180;
 
-    return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
-  }
+    const val =
+      Math.sin(dLat / 2) ** 2 +
+      Math.sin(dLng / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
 
-  const shareUrl = window.location.href;
+    return 2 * R * Math.atan2(Math.sqrt(val), Math.sqrt(1 - val));
+  };
+
+  // 🔗 Share link
+  const share = () => {
+    navigator.clipboard.writeText(window.location.href);
+    alert("Tracking link copied!");
+  };
 
   return (
-    <div style={{ width: "100%", height: "100vh", position: "relative" }}>
-      
-      {/* 📊 Info Panel */}
-      <div style={{
-        position: "absolute",
-        top: 10,
-        left: 10,
-        background: "white",
-        padding: "10px",
-        borderRadius: "10px",
-        zIndex: 1
-      }}>
-        <div>📏 Distance: {distance.toFixed(2)} km</div>
-        <div>⏱️ ETA: {eta.toFixed(1)} hrs</div>
-        <button onClick={() => navigator.clipboard.writeText(shareUrl)}>
-          🔗 Copy Tracking Link
+    <div className="h-screen flex flex-col">
+
+      {/* 🔥 Info Bar */}
+      <div className="p-4 bg-white shadow flex justify-between items-center">
+        <div>
+          <h2 className="font-bold text-lg">Live Tracking</h2>
+          <p>Distance: {distance.toFixed(2)} km</p>
+          <p>ETA: {eta.toFixed(2)} hrs</p>
+        </div>
+
+        <button
+          onClick={share}
+          className="bg-blue-500 text-white px-4 py-2 rounded"
+        >
+          Share 🔗
         </button>
       </div>
 
-      <Map
-        ref={mapRef}
-        initialViewState={{
-          longitude: 78.1460,
-          latitude: 11.6643,
-          zoom: 10
-        }}
-        style={{ width: "100%", height: "100%" }}
-        mapStyle="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
-      >
-
-        {/* 🛣️ Route */}
-        {routeGeoJSON && (
-          <Source id="route" type="geojson" data={routeGeoJSON}>
-            <Layer
-              id="route-line"
-              type="line"
-              layout={{
-                "line-cap": "round",
-                "line-join": "round"
-              }}
-              paint={{
-                "line-color": "#2563eb",
-                "line-width": 4
-              }}
-            />
-          </Source>
-        )}
-
-        {/* 🚗 Vehicle */}
-        {vehiclePosition && (
-          <Marker longitude={vehiclePosition[0]} latitude={vehiclePosition[1]}>
-            <div style={{ fontSize: "24px" }}>🚗</div>
-          </Marker>
-        )}
-      </Map>
+      {/* 🗺️ Map */}
+      <div ref={mapContainer} className="flex-1" />
     </div>
   );
 }
