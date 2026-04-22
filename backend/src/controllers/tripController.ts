@@ -54,7 +54,7 @@ export const tripController = {
         destination_lng: destination_lng ? Number(destination_lng) : undefined,
         start_lat: start_lat ? Number(start_lat) : undefined,
         start_lng: start_lng ? Number(start_lng) : undefined,
-        route_: routeCoords, // ✅ Save the route array to DB
+        route: routeCoords, // ✅ Save the route array to DB
         start_date,
         end_date,
         budget: Number(budget),
