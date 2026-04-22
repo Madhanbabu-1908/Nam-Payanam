@@ -1,41 +1,86 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { Eye, EyeOff, Mail, Lock, User, MapPin } from 'lucide-react';
 
 export default function Register() {
-  const [email, setEmail] = useState('');
+  const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [name, setName]         = useState('');
+  const [show, setShow]         = useState(false);
+  const [error, setError]       = useState<string | null>(null);
+  const [loading, setLoading]   = useState(false);
   const { signUp } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (password.length < 6) { setError('Password must be at least 6 characters'); return; }
+    setLoading(true); setError(null);
     const { error } = await signUp(email, password);
-    if (error) setError(error.message);
-    else {
-      setSuccess(true);
-      setTimeout(() => navigate('/login'), 2000);
-    }
+    if (error) { setError(error.message); setLoading(false); }
+    else navigate('/');
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="max-w-md w-full bg-white p-8 rounded-xl shadow-lg">
-        <h2 className="text-2xl font-bold text-center mb-6 text-gray-900">Create Account 🚀</h2>
-        {success ? (
-          <div className="text-green-600 text-center">Account created! Redirecting...</div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && <div className="bg-red-50 text-red-600 p-3 rounded text-sm">{error}</div>}
-            <input type="email" placeholder="Email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full p-2 border rounded" />
-            <input type="password" placeholder="Password (min 6 chars)" required minLength={6} value={password} onChange={e => setPassword(e.target.value)} className="w-full p-2 border rounded" />
-            <button type="submit" className="w-full bg-indigo-600 text-white py-2 rounded font-medium hover:bg-indigo-700">Sign Up</button>
-          </form>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[var(--bg)] px-5 pt-safe">
+      <div className="text-center mb-8">
+        <div className="w-16 h-16 bg-brand rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-brand">
+          <MapPin className="text-white" size={28}/>
+        </div>
+        <h1 className="font-display font-black text-[var(--text)] text-2xl">Nam Payanam</h1>
+        <p className="font-tamil text-[var(--muted)] text-sm mt-1">நம் பயணம் · Your Journey</p>
+      </div>
+
+      <div className="card w-full max-w-sm p-6 animate-slide-up">
+        <h2 className="font-display font-bold text-[var(--text)] text-xl mb-6">Create account ✨</h2>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-sm mb-4 animate-pop">
+            {error}
+          </div>
         )}
-        <p className="mt-4 text-center text-sm">
-          Have an account? <Link to="/login" className="text-indigo-600 hover:underline">Sign in</Link>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="label">Full Name</label>
+            <div className="relative">
+              <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)]"/>
+              <input className="input pl-10" placeholder="Arun Kumar"
+                value={name} onChange={e => setName(e.target.value)} />
+            </div>
+          </div>
+          <div>
+            <label className="label">Email</label>
+            <div className="relative">
+              <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)]"/>
+              <input type="email" className="input pl-10" placeholder="you@example.com"
+                value={email} onChange={e => setEmail(e.target.value)} required />
+            </div>
+          </div>
+          <div>
+            <label className="label">Password</label>
+            <div className="relative">
+              <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)]"/>
+              <input type={show ? 'text' : 'password'} className="input pl-10 pr-10" placeholder="Min. 6 characters"
+                value={password} onChange={e => setPassword(e.target.value)} required />
+              <button type="button" onClick={() => setShow(!show)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted)]">
+                {show ? <EyeOff size={16}/> : <Eye size={16}/>}
+              </button>
+            </div>
+          </div>
+
+          <button type="submit" disabled={loading} className="btn-primary w-full py-3.5 text-base">
+            {loading ? (
+              <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/>Creating…</>
+            ) : '✨ Create Account'}
+          </button>
+        </form>
+
+        <p className="text-center text-sm text-[var(--muted)] mt-4">
+          Already have an account?{' '}
+          <Link to="/login" className="text-brand font-semibold hover:underline">Sign in</Link>
         </p>
       </div>
     </div>

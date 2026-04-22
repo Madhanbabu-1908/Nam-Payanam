@@ -2,142 +2,172 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../config/api';
-import { PlusCircle, MapPin, LogOut, User } from 'lucide-react';
+import { Plus, MapPin, LogOut, Sparkles, ChevronRight, Calendar, Wallet, User } from 'lucide-react';
 import { Trip } from '../types';
+
+const STATUS_CONFIG: Record<string, { label: string; cls: string; dot: string }> = {
+  PLANNING:  { label: 'Planning',  cls: 'badge-amber',  dot: 'bg-amber-400' },
+  ACTIVE:    { label: 'Live 🟢',   cls: 'badge-jade',   dot: 'bg-jade' },
+  COMPLETED: { label: 'Done',      cls: 'badge-slate',  dot: 'bg-slate-400' },
+};
+
+function TripCard({ trip }: { trip: Trip }) {
+  const navigate = useNavigate();
+  const cfg = STATUS_CONFIG[trip.status] || STATUS_CONFIG.PLANNING;
+  const start = new Date(trip.start_date);
+  const end   = new Date(trip.end_date);
+  const isActive = trip.status === 'ACTIVE';
+
+  return (
+    <div onClick={() => navigate(`/dashboard/${trip.id}`)}
+      className={`card-hover cursor-pointer p-4 ${isActive ? 'ring-2 ring-jade/40' : ''}`}>
+      {isActive && (
+        <div className="flex items-center gap-1.5 mb-2">
+          <div className="live-dot"/> <span className="text-xs font-bold text-jade">LIVE TRIP</span>
+        </div>
+      )}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="font-display font-bold text-[var(--text)] text-base truncate">{trip.name}</h3>
+            <span className={`badge flex-shrink-0 ${cfg.cls}`}>{cfg.label}</span>
+          </div>
+          <p className="text-sm text-[var(--muted)] flex items-center gap-1 truncate">
+            <MapPin size={13}/> {trip.destination}
+          </p>
+        </div>
+        <div className={`w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 ${trip.mode === 'AI' ? 'bg-violet-100' : 'bg-sky-100'}`}>
+          {trip.mode === 'AI' ? <Sparkles size={20} className="text-violet-600"/> : <MapPin size={20} className="text-sky-600"/>}
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between mt-3 pt-3 border-t border-[var(--border)]">
+        <div className="flex items-center gap-3 text-xs text-[var(--muted)]">
+          <span className="flex items-center gap-1">
+            <Calendar size={12}/>
+            {start.toLocaleDateString('en-IN', { day:'numeric', month:'short' })} –{' '}
+            {end.toLocaleDateString('en-IN',   { day:'numeric', month:'short', year:'numeric' })}
+          </span>
+        </div>
+        <div className="flex items-center gap-1 text-xs font-bold text-[var(--muted)]">
+          <Wallet size={12}/> ₹{trip.budget?.toLocaleString('en-IN')}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function Home() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
-  const [trips, setTrips] = useState<Trip[]>([]);
+  const [trips, setTrips]     = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchTrips = async () => {
-      try {
-        // Fetch trips where the user is a member or organizer
-        const res = await api.get('/trips/my'); 
-        
-        if (res.data.success && Array.isArray(res.data.data)) {
-           setTrips(res.data.data);
-        } else if (Array.isArray(res.data)) {
-           setTrips(res.data);
-        }
-      } catch (e) { 
-        console.error("Fetch error", e); 
-        setTrips([]); 
-      } finally { setLoading(false); }
-    };
-    fetchTrips();
+    api.get('/trips/my').then(res => {
+      setTrips(Array.isArray(res.data.data) ? res.data.data : []);
+    }).catch(() => setTrips([])).finally(() => setLoading(false));
   }, []);
 
+  const activeTrip   = trips.find(t => t.status === 'ACTIVE');
+  const planningTrips = trips.filter(t => t.status === 'PLANNING');
+  const pastTrips    = trips.filter(t => t.status === 'COMPLETED');
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Navigation Bar */}
-      <nav className="bg-white shadow-sm px-6 py-4 flex justify-between items-center sticky top-0 z-10">
-        <span 
-          className="text-xl font-bold text-indigo-600 flex items-center gap-2 cursor-pointer"
-          onClick={() => navigate('/')}
-        >
-          🚌 Nam-Payanam
-        </span>
-        
-        <div className="flex items-center gap-4">
-          {/* Display User Email on Desktop */}
-          {user?.email && (
-            <span className="text-sm text-gray-600 hidden sm:block truncate max-w-[150px]">
-              {user.email}
-            </span>
-          )}          
-          {/* Profile Button */}
-          <button 
-            onClick={() => navigate('/profile')} 
-            className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition"
-            title="My Profile"
-          >
-            <User size={20} />
-          </button>
-
-          {/* Logout Button */}
-          <button 
-            onClick={() => signOut()} 
-            className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-full transition"
-            title="Sign Out"
-          >
-            <LogOut size={20} />
-          </button>
-        </div>
-      </nav>
-      
-      {/* Main Content */}
-      <main className="max-w-5xl mx-auto p-6">
-        {/* Header Section */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Your Trips</h1>
-            <p className="text-gray-500 mt-1">Manage your upcoming adventures</p>
-          </div>
-          <button 
-            onClick={() => navigate('/create-trip')} 
-            className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center hover:bg-indigo-700 shadow-md transition transform hover:scale-105"
-          >
-            <PlusCircle className="h-5 w-5 mr-2" /> Create Trip
-          </button>
-        </div>
-
-        {/* Loading State */}
-        {loading ? (
-          <div className="text-center py-12 text-gray-500">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-            <p>Loading your trips...</p>
-          </div>
-        ) : trips.length === 0 ? (
-          /* Empty State */
-          <div className="text-center py-12 bg-white rounded-xl border-2 border-dashed border-gray-200">
-            <div className="bg-indigo-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <MapPin className="h-10 w-10 text-indigo-400" />
+    <div className="page pt-safe">
+      {/* Header */}
+      <header className="glass sticky top-0 z-20 px-4 py-3">
+        <div className="flex items-center justify-between max-w-2xl mx-auto">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 bg-brand rounded-xl flex items-center justify-center">
+              <MapPin size={18} className="text-white"/>
             </div>
-            <h3 className="text-lg font-medium text-gray-900">No trips yet</h3>            <p className="text-gray-500 mt-1 mb-6">Get started by creating your first trip!</p>
-            <button 
-              onClick={() => navigate('/create-trip')}
-              className="text-indigo-600 font-medium hover:underline"
-            >
-              Create a Trip &rarr;
+            <div>
+              <p className="font-display font-black text-[var(--text)] text-base leading-none">Nam Payanam</p>
+              <p className="font-tamil text-[var(--muted)] text-[11px]">நம் பயணம்</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => navigate('/profile')}
+              className="btn-icon bg-[var(--bg)] text-[var(--muted)] hover:text-brand">
+              <User size={18}/>
+            </button>
+            <button onClick={signOut}
+              className="btn-icon bg-[var(--bg)] text-[var(--muted)] hover:text-rose-500">
+              <LogOut size={18}/>
             </button>
           </div>
-        ) : (
-          /* Trips Grid */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {trips.map(trip => (
-              <div 
-                key={trip.id} 
-                onClick={() => navigate(`/dashboard/${trip.id}`)} 
-                className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md cursor-pointer border border-gray-100 transition group transform hover:-translate-y-1"
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="font-bold text-lg text-gray-900 group-hover:text-indigo-600 transition line-clamp-1">
-                    {trip.name}
-                  </h3>
-                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                    trip.mode === 'AI' 
-                      ? 'bg-purple-100 text-purple-700' 
-                      : 'bg-blue-100 text-blue-700'
-                  }`}>
-                    {trip.mode}
-                  </span>
-                </div>
-                
-                <p className="text-gray-500 text-sm flex items-center gap-1 mb-2">
-                  <MapPin size={14} /> 
-                  <span className="truncate">{trip.destination}</span>
-                </p>
-                
-                <div className="pt-4 border-t border-gray-100 flex justify-between items-center text-xs text-gray-400">
-                  <span>{new Date(trip.start_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
-                  <span>&rarr;</span>
-                  <span>{new Date(trip.end_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
-                </div>
-              </div>
-            ))}
+        </div>
+      </header>
+
+      <main className="max-w-2xl mx-auto px-4 pt-5 space-y-6">
+        {/* Greeting */}
+        <div>
+          <h1 className="font-display font-black text-[var(--text)] text-2xl">
+            Hey {user?.user_metadata?.full_name?.split(' ')[0] || 'Traveller'} 👋
+          </h1>
+          <p className="text-[var(--muted)] text-sm mt-0.5">Where will you go next?</p>
+        </div>
+
+        {/* CTA */}
+        <button onClick={() => navigate('/create-trip')}
+          className="btn-primary w-full py-4 text-base">
+          <Plus size={20}/> Plan a New Trip
+        </button>
+
+        {/* Active trip banner */}
+        {activeTrip && (
+          <div onClick={() => navigate(`/dashboard/${activeTrip.id}`)}
+            className="bg-gradient-to-r from-jade to-teal-600 rounded-2xl p-4 cursor-pointer active:scale-[0.98] transition-transform">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="live-dot bg-white/80"/><span className="text-white/80 text-xs font-bold">ACTIVE NOW</span>
+            </div>
+            <h3 className="font-display font-bold text-white text-lg">{activeTrip.name}</h3>
+            <p className="text-white/70 text-sm flex items-center gap-1"><MapPin size={13}/>{activeTrip.destination}</p>
+            <div className="flex items-center gap-1 text-white/60 text-xs mt-2">
+              Open trip <ChevronRight size={14}/>
+            </div>
+          </div>
+        )}
+
+        {/* Loading skeletons */}
+        {loading && (
+          <div className="space-y-3">
+            {[1,2,3].map(i => <div key={i} className="skeleton h-28"/>)}
+          </div>
+        )}
+
+        {/* Planning trips */}
+        {!loading && planningTrips.length > 0 && (
+          <section>
+            <h2 className="font-display font-bold text-[var(--text)] mb-3">Planning</h2>
+            <div className="space-y-3">
+              {planningTrips.map(t => <TripCard key={t.id} trip={t}/>)}
+            </div>
+          </section>
+        )}
+
+        {/* Past trips */}
+        {!loading && pastTrips.length > 0 && (
+          <section>
+            <h2 className="font-display font-bold text-[var(--text)] mb-3">Past Trips</h2>
+            <div className="space-y-3">
+              {pastTrips.map(t => <TripCard key={t.id} trip={t}/>)}
+            </div>
+          </section>
+        )}
+
+        {/* Empty state */}
+        {!loading && trips.length === 0 && (
+          <div className="card p-8 text-center animate-fade-in">
+            <div className="w-20 h-20 bg-brand/10 rounded-full flex items-center justify-center mx-auto mb-4">
+              <MapPin size={36} className="text-brand"/>
+            </div>
+            <h3 className="font-display font-bold text-[var(--text)] text-lg">No trips yet</h3>
+            <p className="text-[var(--muted)] text-sm mt-1 mb-5">Create your first group trip and start exploring!</p>
+            <button onClick={() => navigate('/create-trip')} className="btn-primary mx-auto w-fit">
+              <Plus size={18}/> Create Trip
+            </button>
           </div>
         )}
       </main>

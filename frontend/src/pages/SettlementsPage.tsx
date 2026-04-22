@@ -1,116 +1,146 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../config/api';
-import { useAuth } from '../context/AuthContext'; // ✅ Use Auth Context
-import { ArrowLeft, TrendingUp, ArrowRight, CheckCircle } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { ArrowLeft, ArrowRight, CheckCircle, TrendingUp, RefreshCw } from 'lucide-react';
 
 export default function SettlementsPage() {
   const { tripId } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth(); // ✅ Get user from context
-  
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [balances, setBalances] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const [transactions, setTx]   = useState<any[]>([]);
+  const [balances, setBal]       = useState<Record<string, number>>({});
+  const [loading, setLoading]    = useState(true);
+  const [settled, setSettled]    = useState<Set<number>>(new Set());
+  const [members, setMembers]    = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    if (!tripId || !user) return;
+  const load = async () => {
+    setLoading(true);
+    try {
+      const [settleRes, memRes] = await Promise.all([
+        api.get(`/expenses/${tripId}/settlements`),
+        api.get(`/trips/${tripId}/members`).catch(() => ({ data: { data: [] } })),
+      ]);
+      setTx(settleRes.data.data?.transactions || []);
+      setBal(settleRes.data.data?.balances || {});
 
-    const fetchSettlements = async () => {
-      try {
-        const res = await api.get(`/expenses/${tripId}/settlements`);
-        if (res.data.success) {
-          setTransactions(res.data.data.transactions || []);
-          setBalances(res.data.data.balances || {});
-        }
-      } catch (error) {
-        console.error("Failed to load settlements", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+      // Build name map from members
+      const nameMap: Record<string, string> = {};
+      (memRes.data.data || []).forEach((m: any) => {
+        nameMap[m.user_id] = m.user_id === user?.id ? 'You' : m.user_id.substring(0, 8) + '…';
+      });
+      setMembers(nameMap);
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
+  };
 
-    fetchSettlements();
-  }, [tripId, user]);
+  useEffect(() => { if (tripId) load(); }, [tripId]);
 
-  // Get current user's balance safely
-  const myBalance = user ? (balances[user.id] || 0) : 0;
-  const isOwed = myBalance > 0;
-  const owes = myBalance < 0;
+  const myBal    = user ? (balances[user.id] || 0) : 0;
+  const isOwed   = myBal > 0.01;
+  const owesOthers = myBal < -0.01;
+  const name = (id: string) => members[id] || id.substring(0, 8) + '…';
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-20 transition-colors duration-300">
-      {/* Header */}
-      <header className="glass sticky top-0 z-20 px-6 py-4 flex items-center gap-3 backdrop-blur-md bg-white/80 dark:bg-slate-800/80 border-b border-slate-200/50 dark:border-slate-700">
-        <button onClick={() => navigate(-1)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition">
-          <ArrowLeft className="text-slate-600 dark:text-slate-300"/>
-        </button>
-        <h1 className="font-bold text-lg text-slate-800 dark:text-white">Settlements</h1>
+    <div className="page pt-safe">
+      <header className="glass sticky top-0 z-20 px-4 py-3">
+        <div className="flex items-center gap-3 max-w-2xl mx-auto">
+          <button onClick={() => navigate(-1)} className="btn-icon bg-[var(--bg)]">
+            <ArrowLeft size={20} className="text-[var(--muted)]" />
+          </button>
+          <h1 className="font-display font-bold text-[var(--text)] flex-1">Settlements</h1>
+          <button onClick={load} className="btn-icon bg-[var(--bg)] text-[var(--muted)]">
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+          </button>
+        </div>
       </header>
-      <main className="p-6 space-y-6 animate-fade-in">
-        {/* Summary Cards */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className={`p-4 rounded-2xl border transition-colors ${
-            isOwed 
-              ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-100 dark:border-emerald-800' 
-              : 'bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700 opacity-50'
-          }`}>
-            <p className="text-xs text-emerald-700 dark:text-emerald-400 font-bold uppercase tracking-wider">You Are Owed</p>
-            <p className="text-2xl font-bold text-emerald-800 dark:text-emerald-300 mt-1">
-              ₹{isOwed ? myBalance.toFixed(0) : '0'}
+
+      <main className="max-w-2xl mx-auto px-4 pt-4 space-y-4">
+        {/* My balance */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className={`stat-card border-l-4 ${isOwed ? 'border-l-jade' : 'border-l-transparent'}`}>
+            <p className="text-xs font-bold text-jade uppercase tracking-wider">You Are Owed</p>
+            <p className="font-display font-black text-2xl text-[var(--text)] mt-0.5">
+              ₹{isOwed ? myBal.toFixed(0) : '0'}
             </p>
           </div>
-          <div className={`p-4 rounded-2xl border transition-colors ${
-            owes 
-              ? 'bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-800' 
-              : 'bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700 opacity-50'
-          }`}>
-            <p className="text-xs text-red-700 dark:text-red-400 font-bold uppercase tracking-wider">You Owe</p>
-            <p className="text-2xl font-bold text-red-800 dark:text-red-300 mt-1">
-              ₹{owes ? Math.abs(myBalance).toFixed(0) : '0'}
+          <div className={`stat-card border-l-4 ${owesOthers ? 'border-l-rose-500' : 'border-l-transparent'}`}>
+            <p className="text-xs font-bold text-rose-500 uppercase tracking-wider">You Owe</p>
+            <p className="font-display font-black text-2xl text-[var(--text)] mt-0.5">
+              ₹{owesOthers ? Math.abs(myBal).toFixed(0) : '0'}
             </p>
           </div>
         </div>
 
-        {/* Action List */}
+        {/* All balances */}
+        {Object.keys(balances).length > 0 && (
+          <div className="card p-4">
+            <p className="text-xs font-bold text-[var(--muted)] uppercase mb-3">All Balances</p>
+            <div className="space-y-2">
+              {Object.entries(balances).map(([uid, bal]) => (
+                <div key={uid} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-[var(--bg)] rounded-lg flex items-center justify-center text-xs font-bold text-[var(--muted)]">
+                      {name(uid).charAt(0).toUpperCase()}
+                    </div>
+                    <span className="text-sm font-semibold text-[var(--text)]">{name(uid)}</span>
+                  </div>
+                  <span className={`font-display font-bold text-sm px-3 py-1 rounded-xl ${
+                    bal > 0.01 ? 'bg-emerald-50 text-jade' :
+                    bal < -0.01 ? 'bg-red-50 text-rose-600' : 'bg-[var(--bg)] text-[var(--muted)]'
+                  }`}>
+                    {bal > 0.01 ? '+' : ''}{bal.toFixed(0)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Transactions */}
         <div>
-          <h3 className="font-bold text-slate-700 dark:text-slate-300 mb-4 flex items-center gap-2">
-            <TrendingUp size={20} className="text-indigo-600"/> Recommended Payments
+          <h3 className="font-display font-bold text-[var(--text)] mb-3 flex items-center gap-2">
+            <TrendingUp size={18} className="text-brand" /> Recommended Payments
           </h3>
-          
           {loading ? (
-            <div className="text-center py-10 text-slate-400">Calculating settlements...</div>
+            <div className="space-y-2">{[1,2,3].map(i=><div key={i} className="skeleton h-16"/>)}</div>
           ) : transactions.length === 0 ? (
-            <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl text-center border border-slate-100 dark:border-slate-700">
-              <CheckCircle className="h-12 w-12 text-emerald-500 mx-auto mb-3" />
-              <p className="text-slate-600 dark:text-slate-300 font-medium">All settled up! 🎉</p>
-              <p className="text-sm text-slate-400 mt-1">No one owes anyone anything.</p>
+            <div className="card p-8 text-center">
+              <CheckCircle size={44} className="text-jade mx-auto mb-3" />
+              <p className="font-display font-bold text-[var(--text)] text-lg">All Settled! 🎉</p>
+              <p className="text-[var(--muted)] text-sm mt-1">No one owes anyone anything.</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {transactions.map((t, idx) => (
-                <div key={idx} className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center justify-between transition hover:shadow-md">
-                  <div className="flex items-center gap-3 flex-1">
-                    <div className="h-10 w-10 bg-indigo-100 dark:bg-indigo-900/50 rounded-full flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-bold text-sm">
-                      {t.from.substring(0, 2).toUpperCase()}
+              {transactions.map((t, idx) => {
+                const isMe = t.from === user?.id;
+                const done = settled.has(idx);
+                return (
+                  <div key={idx} className={`card p-4 transition-all ${done ? 'opacity-50' : ''}`}>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-[var(--bg)] rounded-xl flex items-center justify-center font-bold text-[var(--muted)] flex-shrink-0 text-sm">
+                        {name(t.from).charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-[var(--muted)]">
+                          <span className="font-bold text-[var(--text)]">{name(t.from)}</span>
+                          {' '}pays{' '}
+                          <span className="font-bold text-[var(--text)]">{name(t.to)}</span>
+                        </p>
+                      </div>
+                      <ArrowRight size={14} className="text-[var(--muted)]" />
+                      <span className="font-display font-black text-jade text-lg">₹{t.amount}</span>
                     </div>
-                    <div className="flex flex-col">
-                      <span className="text-xs text-slate-500 dark:text-slate-400">Pays</span>
-                      <span className="font-bold text-slate-800 dark:text-white text-sm truncate max-w-[100px]">{t.from}</span>                    </div>
+                    {isMe && !done && (
+                      <button onClick={() => setSettled(s => new Set([...s, idx]))}
+                        className="mt-3 w-full btn-secondary py-2 text-sm border-jade/30 text-jade">
+                        <CheckCircle size={14} /> Mark as Paid
+                      </button>
+                    )}
+                    {done && <p className="text-center text-xs text-jade font-bold mt-2">✓ Marked as paid</p>}
                   </div>
-                  
-                  <ArrowRight className="text-slate-300 dark:text-slate-600 mx-2" size={16} />
-                  
-                  <div className="flex flex-col items-end flex-1">
-                    <span className="text-xs text-slate-500 dark:text-slate-400">To</span>
-                    <span className="font-bold text-slate-800 dark:text-white text-sm truncate max-w-[100px]">{t.to}</span>
-                  </div>
-                  
-                  <div className="ml-4 font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-3 py-1 rounded-full text-sm">
-                    ₹{t.amount}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

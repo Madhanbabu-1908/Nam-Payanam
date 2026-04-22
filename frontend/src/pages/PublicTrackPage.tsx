@@ -1,183 +1,74 @@
-import { useEffect, useRef, useState } from "react";
-import maplibregl from "maplibre-gl";
-import type { Feature, LineString, Position } from "geojson";
-import "maplibre-gl/dist/maplibre-gl.css";
+import { useEffect, useRef, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { api } from '../config/api';
+import { MapPin, Navigation } from 'lucide-react';
 
-type Trip = {
-  id: string;
-  route?: LineString;
-};
-
-type Location = {
-  lng: number;
-  lat: number;
-};
+declare const L: any;
 
 export default function PublicTrackPage() {
-  const mapContainer = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<maplibregl.Map | null>(null);
-  const vehicleMarker = useRef<maplibregl.Marker | null>(null);
+  const { tripId } = useParams();
+  const mapRef  = useRef<HTMLDivElement>(null);
+  const mapInst = useRef<any>(null);
+  const [trip, setTrip] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [livePos, setLivePos] = useState<any>(null);
 
-  const [trip, setTrip] = useState<Trip | null>(null);
-  const [distance, setDistance] = useState<number>(0);
-  const [eta, setEta] = useState<number>(0);
-
-  const tripId = window.location.pathname.split("/").pop();
-
-  const API_URL = import.meta.env.VITE_API_URL;
-  const WS_URL = API_URL.replace(/^http/, "ws");
-
-  // ✅ Helper: Convert Position → Tuple
-  const toLngLat = (pos: Position): [number, number] => {
-    return [pos[0], pos[1]];
-  };
-
-  // 🚀 Fetch Trip
   useEffect(() => {
     if (!tripId) return;
-
-    fetch(`${API_URL}/trips/${tripId}`)
-      .then(res => res.json())
-      .then(data => setTrip(data.data))
-      .catch(err => console.error(err));
+    api.get(`/trips/${tripId}`).then(r => { setTrip(r.data.data); setLoading(false); }).catch(()=>setLoading(false));
+    api.get(`/tracking/trips/${tripId}/location`).then(r => { if(r.data.data) setLivePos(r.data.data); }).catch(()=>{});
   }, [tripId]);
 
-  // 🗺️ Init Map
   useEffect(() => {
-    if (!mapContainer.current) return;
+    if (!mapRef.current || mapInst.current || !L || !trip) return;
+    const center = trip.start_lat ? [+trip.start_lat, +trip.start_lng] : [11.0,77.0];
+    const map = L.map(mapRef.current, { zoomControl:true, attributionControl:false }).setView(center, 10);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19 }).addTo(map);
+    mapInst.current = map;
 
-    mapRef.current = new maplibregl.Map({
-      container: mapContainer.current,
-      style: "https://demotiles.maplibre.org/style.json",
-      center: [78.9629, 20.5937],
-      zoom: 4,
-    });
-
-    mapRef.current.addControl(new maplibregl.NavigationControl());
-
-    return () => mapRef.current?.remove();
-  }, []);
-
-  // 🚀 Draw Route
-  useEffect(() => {
-    if (!trip?.route || !mapRef.current) return;
-
-    const map = mapRef.current;
-    const coords = trip.route.coordinates;
-
-    const routeFeature: Feature<LineString> = {
-      type: "Feature",
-      properties: {},
-      geometry: trip.route,
-    };
-
-    if (!map.getSource("route")) {
-      map.addSource("route", {
-        type: "geojson",
-        data: routeFeature,
-      });
-
-      map.addLayer({
-        id: "route-line",
-        type: "line",
-        source: "route",
-        paint: {
-          "line-color": "#007bff",
-          "line-width": 4,
-        },
-      });
+    if (trip.start_lat) {
+      const sIcon = L.divIcon({ html:`<div style="background:#10B981;border:3px solid white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:12px;font-weight:900;box-shadow:0 2px 8px rgba(0,0,0,.2)">S</div>`, className:'', iconSize:[28,28], iconAnchor:[14,14] });
+      L.marker([+trip.start_lat, +trip.start_lng], { icon:sIcon }).addTo(map).bindPopup(`Start: ${trip.start_location||''}`);
     }
-
-    // ✅ FIXED: bounds typing
-    const bounds = new maplibregl.LngLatBounds();
-    coords.forEach(c => bounds.extend(toLngLat(c)));
-    map.fitBounds(bounds, { padding: 50 });
-
-    // ✅ FIXED: distance typing
-    let total = 0;
-    for (let i = 1; i < coords.length; i++) {
-      total += getDistance(toLngLat(coords[i - 1]), toLngLat(coords[i]));
+    if (trip.destination_lat) {
+      const eIcon = L.divIcon({ html:`<div style="background:#FF6B35;border:3px solid white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:12px;font-weight:900;box-shadow:0 2px 8px rgba(0,0,0,.2)">E</div>`, className:'', iconSize:[28,28], iconAnchor:[14,14] });
+      L.marker([+trip.destination_lat, +trip.destination_lng], { icon:eIcon }).addTo(map).bindPopup(`Destination: ${trip.destination||''}`);
     }
-
-    setDistance(total);
-    setEta(total / 40);
-
-  }, [trip]);
-
-  // 🚗 WebSocket
-  useEffect(() => {
-    if (!mapRef.current || !tripId) return;
-
-    const socket = new WebSocket(`${WS_URL}/track/${tripId}`);
-
-    socket.onmessage = (event) => {
-      const loc: Location = JSON.parse(event.data);
-      animateVehicle(loc);
-    };
-
-    return () => socket.close();
-  }, [tripId]);
-
-  // 🚗 Animate
-  const animateVehicle = (target: Location) => {
-    if (!mapRef.current) return;
-
-    if (!vehicleMarker.current) {
-      const el = document.createElement("div");
-      el.innerHTML = "🚗";
-      el.style.fontSize = "28px";
-
-      vehicleMarker.current = new maplibregl.Marker(el)
-        .setLngLat([target.lng, target.lat])
-        .addTo(mapRef.current);
-
-      return;
+    if (livePos) {
+      const vIcon = L.divIcon({ html:`<div style="background:#FF6B35;border:3px solid white;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 3px 12px rgba(255,107,53,.5)">🚗</div>`, className:'', iconSize:[36,36], iconAnchor:[18,18] });
+      L.marker([+livePos.latitude, +livePos.longitude], { icon:vIcon, zIndexOffset:1000 }).addTo(map).bindPopup(`Last updated: ${new Date(livePos.recorded_at).toLocaleTimeString('en-IN')}`);
     }
+  }, [trip, livePos]);
 
-    const start = vehicleMarker.current.getLngLat();
-    const duration = 1000;
-    const startTime = performance.now();
-
-    const animate = (time: number) => {
-      const progress = Math.min((time - startTime) / duration, 1);
-
-      const lng = start.lng + (target.lng - start.lng) * progress;
-      const lat = start.lat + (target.lat - start.lat) * progress;
-
-      vehicleMarker.current!.setLngLat([lng, lat]);
-
-      if (progress < 1) requestAnimationFrame(animate);
-    };
-
-    requestAnimationFrame(animate);
-  };
-
-  // 📏 Distance
-  const getDistance = (a: [number, number], b: [number, number]) => {
-    const R = 6371;
-
-    const dLat = (b[1] - a[1]) * Math.PI / 180;
-    const dLng = (b[0] - a[0]) * Math.PI / 180;
-
-    const lat1 = a[1] * Math.PI / 180;
-    const lat2 = b[1] * Math.PI / 180;
-
-    const val =
-      Math.sin(dLat / 2) ** 2 +
-      Math.sin(dLng / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
-
-    return 2 * R * Math.atan2(Math.sqrt(val), Math.sqrt(1 - val));
-  };
+  if (loading) return (
+    <div className="h-screen flex items-center justify-center bg-[var(--bg)]">
+      <div className="w-10 h-10 border-2 border-brand/20 border-t-brand rounded-full animate-spin"/>
+    </div>
+  );
 
   return (
-    <div className="h-screen flex flex-col">
-      <div className="p-4 bg-white shadow">
-        <h2 className="font-bold">Live Tracking</h2>
-        <p>Distance: {distance.toFixed(2)} km</p>
-        <p>ETA: {eta.toFixed(2)} hrs</p>
+    <div className="flex flex-col h-screen bg-[var(--bg)]">
+      <header className="glass z-20 px-4 py-3">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-brand rounded-xl flex items-center justify-center"><MapPin size={16} className="text-white"/></div>
+          <div>
+            <p className="font-display font-bold text-[var(--text)] text-sm">{trip?.name || 'Live Tracker'}</p>
+            <p className="text-[var(--muted)] text-xs flex items-center gap-1">
+              {livePos ? <><div className="w-1.5 h-1.5 bg-jade rounded-full animate-pulse"/><span className="text-jade">Live</span></> : <><Navigation size={10}/>{trip?.destination}</>}
+            </p>
+          </div>
+        </div>
+      </header>
+      <div className="flex-1 relative">
+        <div ref={mapRef} className="w-full h-full"/>
+        {!livePos && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="bg-[var(--surface)]/90 backdrop-blur-sm rounded-2xl px-5 py-3 shadow-float">
+              <p className="text-sm font-semibold text-[var(--muted)]">Waiting for live location…</p>
+            </div>
+          </div>
+        )}
       </div>
-
-      <div ref={mapContainer} className="flex-1" />
     </div>
   );
 }

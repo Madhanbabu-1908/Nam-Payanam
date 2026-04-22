@@ -1,93 +1,56 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { api } from '../config/api';
-import { supabase } from '../config/supabaseClient';
-import { ArrowLeft, AlertTriangle, LogOut, User, ShieldAlert } from 'lucide-react';
-import { Button } from '../components/common/Button';
+import { ArrowLeft, Moon, Sun, LogOut, User } from 'lucide-react';
 
 export default function ProfilePage() {
-  const navigate = useNavigate();
   const { user, signOut } = useAuth();
-  const [isDeleting, setIsDeleting] = useState(false);
+  const navigate = useNavigate();
+  const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'));
 
-  const handleDeleteAccount = async () => {
-    const confirmed = window.confirm(
-      "⚠️ DANGER: This will PERMANENTLY delete your account, ALL your trips, expenses, and data. This cannot be undone. Are you absolutely sure?"
-    );
-
-    if (!confirmed) return;
-
-    setIsDeleting(true);
-    try {
-      await api.delete('/auth/account');
-      alert('Account deleted successfully. Goodbye!');
-      await supabase.auth.signOut();
-      window.location.href = '/login';
-    } catch (error: any) {
-      alert('Failed to delete account: ' + (error.response?.data?.error || error.message));
-    } finally {
-      setIsDeleting(false);
-    }
+  const toggleDark = () => {
+    const next = !dark;
+    setDark(next);
+    document.documentElement.classList.toggle('dark', next);
+    localStorage.setItem('np_dark', next ? '1' : '0');
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm px-6 py-4 flex items-center gap-4 sticky top-0 z-10">
-        <button onClick={() => navigate(-1)} className="p-2 hover:bg-gray-100 rounded-full transition">
-          <ArrowLeft className="text-gray-600" />
-        </button>
-        <h1 className="text-xl font-bold text-gray-900">My Profile</h1>
+    <div className="page pt-safe">
+      <header className="glass sticky top-0 z-20 px-4 py-3">
+        <div className="flex items-center gap-3 max-w-2xl mx-auto">
+          <button onClick={() => navigate(-1)} className="btn-icon bg-[var(--bg)]">
+            <ArrowLeft size={20} className="text-[var(--muted)]"/>
+          </button>
+          <h1 className="font-display font-bold text-[var(--text)] flex-1">Profile</h1>
+        </div>
       </header>
-
-      <main className="max-w-2xl mx-auto p-6 space-y-8">
-        
-        {/* User Info Card */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-center gap-4">
-          <div className="h-12 w-12 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600">
-            <User size={24} />
+      <main className="max-w-2xl mx-auto px-4 pt-6 space-y-4">
+        <div className="card p-5 flex items-center gap-4">
+          <div className="w-16 h-16 bg-brand/10 rounded-2xl flex items-center justify-center">
+            <User size={32} className="text-brand"/>
           </div>
           <div>
-            <h2 className="font-bold text-lg text-gray-900">{user?.email}</h2>
-            <p className="text-sm text-gray-500">ID: {user?.id}</p>
+            <p className="font-display font-bold text-[var(--text)] text-lg">{user?.user_metadata?.full_name || 'Traveller'}</p>
+            <p className="text-[var(--muted)] text-sm">{user?.email}</p>
           </div>
         </div>
-
-        {/* Account Danger Zone */}
-        <div className="bg-white rounded-xl shadow-sm border border-red-100 overflow-hidden">
-          <div className="bg-red-50 px-6 py-4 border-b border-red-100 flex items-center gap-3">
-            <ShieldAlert className="text-red-600 h-6 w-6" />
-            <h2 className="text-lg font-bold text-red-800">Account Danger Zone</h2>
-          </div>
-          <div className="p-6">
-            <div className="flex items-start gap-3 bg-yellow-50 p-4 rounded-lg border border-yellow-200 mb-6">
-              <AlertTriangle className="text-yellow-600 h-5 w-5 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-yellow-700">
-                <strong>Warning:</strong> Deleting your account is irreversible. It will remove:
-                <ul className="list-disc list-inside mt-1 ml-1">
-                  <li>Your login credentials</li>
-                  <li>All trips you created (and their data)</li>
-                  <li>Your membership in other trips</li>
-                  <li>All expenses you recorded</li>
-                </ul>
-              </p>
+        <div className="card divide-y divide-[var(--border)]">
+          <div className="p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {dark ? <Moon size={18} className="text-indigo-400"/> : <Sun size={18} className="text-amber-500"/>}
+              <span className="font-semibold text-[var(--text)] text-sm">Dark Mode</span>
             </div>
-            
-            <Button variant="danger" onClick={handleDeleteAccount} isLoading={isDeleting} className="w-full sm:w-auto">
-              {isDeleting ? 'Deleting Account...' : 'Delete My Account Permanently'}
-            </Button>
+            <button onClick={toggleDark}
+              className={`w-12 h-6 rounded-full transition-all duration-200 relative ${dark?'bg-brand':'bg-[var(--border)]'}`}>
+              <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all duration-200 ${dark?'left-6':'left-0.5'}`}/>
+            </button>
           </div>
+          <button onClick={signOut} className="p-4 flex items-center gap-3 w-full text-rose-500 hover:bg-rose-50 transition-colors">
+            <LogOut size={18}/><span className="font-semibold text-sm">Sign Out</span>
+          </button>
         </div>
-
-        {/* Logout Section */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h3 className="font-bold text-gray-900 mb-4">Session</h3>
-          <Button variant="secondary" onClick={() => signOut()} className="w-full">
-            Sign Out
-          </Button>
-        </div>
-
+        <p className="text-center font-tamil text-[var(--muted)] text-xs pt-2">உங்கள் பயண தோழன் — Nam Payanam v2</p>
       </main>
     </div>
   );
