@@ -5,6 +5,10 @@ import { aiService } from '../services/aiService';
 import { supabaseAdmin } from '../config/db';
 
 export const tripController = {
+  /**
+   * POST /api/trips
+   * Creates a new trip, adds the user as ORGANIZER, and optionally generates AI itinerary.
+   */
   createTrip: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { 
@@ -28,30 +32,37 @@ export const tripController = {
 
       const userId = req.user.id;
 
-      // 1. Create the Trip with BOTH name and coordinates
+      // Debug Log
+      console.log("📝 Creating Trip:", { name, destination, mode, userId });
+
+      // 1. Create the Trip with Coordinates
       const newTrip = await tripService.createTrip({
         organizer_id: userId,
         name,
-        destination,           // ← Human-readable name (e.g., "Ooty")
-        start_location,        // ← Human-readable name (e.g., "Salem")
-        destination_lat,       // ← Coordinates for mapping
-        destination_lng,
-        start_lat,
-        start_lng,
+        destination,           // Human-readable name (e.g., "Ooty")
+        start_location,        // Human-readable start name (e.g., "Salem")
+        destination_lat: destination_lat ? parseFloat(destination_lat) : null,
+        destination_lng: destination_lng ? parseFloat(destination_lng) : null,
+        start_lat: start_lat ? parseFloat(start_lat) : null,
+        start_lng: start_lng ? parseFloat(start_lng) : null,
         start_date,
         end_date,
-        budget,
-        mode,
+        budget: parseFloat(budget),        mode,
         status: 'PLANNING',
       });
 
+      console.log("✅ Trip Created in DB:", newTrip.id);
+
       // 2. Add User as ORGANIZER to trip_members
       const { error: memberError } = await supabaseAdmin.from('trip_members').insert({
-        trip_id: newTrip.id,        user_id: userId,
+        trip_id: newTrip.id,
+        user_id: userId,
         role: 'ORGANIZER'
       });
 
       if (memberError) {
+        console.error("❌ Failed to add organizer:", memberError);
+        // Rollback trip creation if member insertion fails
         await supabaseAdmin.from('trips').delete().eq('id', newTrip.id);
         throw memberError;
       }
@@ -64,7 +75,7 @@ export const tripController = {
           const aiItems = await aiService.generateItinerary({
             destination,
             days,
-            budget,
+            budget: parseFloat(budget),
             interests: Array.isArray(interests) ? interests : interests.split(',').map((s: string) => s.trim()),
             startLocation: start_location
           });
@@ -77,31 +88,41 @@ export const tripController = {
           if (itemsToInsert.length > 0) {
             const { error: insertError } = await supabaseAdmin.from('itinerary_items').insert(itemsToInsert);
             if (insertError) {
-              console.error('Failed to insert AI items:', insertError);
+              console.error('⚠️ Failed to insert AI items:', insertError);
+              // We don't throw here to avoid failing the whole trip creation
+            } else {
+              console.log("✅ AI Itinerary Generated");
             }
           }
         } catch (aiError: any) {
-          console.error('AI Generation failed but trip created:', aiError.message);
-        }
-      }
+          console.error('⚠️ AI Generation failed but trip created:', aiError.message);
+        }      }
 
-      res.status(201).json({ success: true, data: newTrip });
+      res.status(201).json({ success: true,  newTrip });
     } catch (error: any) {
+      console.error("❌ CRITICAL ERROR in createTrip:", error);
       next(error);
     }
   },
 
+  /**
+   * GET /api/trips/my
+   * Fetches all trips where the user is either an Organizer or a Member.
+   */
   getMyTrips: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const userId = req.user!.id;
 
+      // 1. Get all trip IDs where user is a member
       const { data: membersData, error: memberError } = await supabaseAdmin
-        .from('trip_members')        .select('trip_id')
+        .from('trip_members')
+        .select('trip_id')
         .eq('user_id', userId);
 
       if (memberError) throw memberError;
       const memberTripIds = membersData?.map((m: any) => m.trip_id) || [];
 
+      // 2. Get all trip IDs where user is the organizer
       const { data: ownedData, error: ownerError } = await supabaseAdmin
         .from('trips')
         .select('id')
@@ -110,12 +131,14 @@ export const tripController = {
       if (ownerError) throw ownerError;
       const ownedTripIds = ownedData?.map((t: any) => t.id) || [];
 
+      // 3. Combine and remove duplicates
       const allTripIds = [...new Set([...memberTripIds, ...ownedTripIds])];
 
       if (allTripIds.length === 0) {
-        return res.json({ success: true, data: [] });
+        return res.json({ success: true,  [] });
       }
 
+      // 4. Fetch full trip details
       const { data: trips, error: tripsError } = await supabaseAdmin
         .from('trips')
         .select('*')
@@ -123,13 +146,16 @@ export const tripController = {
         .order('created_at', { ascending: false });
 
       if (tripsError) throw tripsError;
-
-      res.json({ success: true, data: trips });
+      res.json({ success: true,  trips });
     } catch (error: any) {
       next(error);
     }
   },
 
+  /**
+   * GET /api/trips/:tripId
+   * Fetches details of a single trip.
+   */
   getTrip: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { tripId } = req.params;
@@ -144,11 +170,16 @@ export const tripController = {
         return res.status(404).json({ success: false, error: 'Trip not found' });
       }
 
-      res.json({ success: true, data: trip });
-    } catch (error: any) {      next(error);
+      res.json({ success: true,  trip });
+    } catch (error: any) {
+      next(error);
     }
   },
 
+  /**
+   * POST /api/trips/:tripId/join
+   * Allows an authenticated user to join an existing trip as a PARTICIPANT.
+   */
   joinTrip: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { tripId } = req.params;
@@ -158,16 +189,17 @@ export const tripController = {
         return res.status(400).json({ success: false, error: 'Trip ID is required' });
       }
 
+      // 1. Verify Trip Exists
       const { data: trip, error: tripError } = await supabaseAdmin
         .from('trips')
         .select('id, name')
         .eq('id', tripId)
         .single();
-
       if (tripError || !trip) {
         return res.status(404).json({ success: false, error: 'Trip not found' });
       }
 
+      // 2. Check if User is Already a Member
       const { data: existingMember } = await supabaseAdmin
         .from('trip_members')
         .select('id')
@@ -179,6 +211,7 @@ export const tripController = {
         return res.status(400).json({ success: false, error: 'You are already a member of this trip' });
       }
 
+      // 3. Add User as PARTICIPANT
       const { data: newMember, error: memberError } = await supabaseAdmin
         .from('trip_members')
         .insert({
@@ -194,19 +227,24 @@ export const tripController = {
       res.json({
         success: true,
         message: `Successfully joined ${trip.name}!`,
-        data: newMember      });
+        data: newMember
+      });
 
     } catch (error: any) {
       next(error);
     }
   },
 
+  /**
+   * PUT/PATCH /api/trips/:tripId
+   * Updates trip details (Organizer only).
+   */
   updateTrip: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { tripId } = req.params;
       const updates = req.body;
       const userId = req.user!.id;
-
+      // Verify Ownership
       const { data: trip } = await supabaseAdmin
         .from('trips')
         .select('organizer_id')
@@ -226,12 +264,16 @@ export const tripController = {
 
       if (error) throw error;
 
-      res.json({ success: true, data: updatedTrip });
+      res.json({ success: true,  updatedTrip });
     } catch (error: any) {
       next(error);
     }
   },
 
+  /**
+   * DELETE /api/trips/:tripId
+   * Deletes a trip and all associated data (Organizer only).
+   */
   deleteTrip: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { tripId } = req.params;
@@ -241,15 +283,16 @@ export const tripController = {
         return res.status(400).json({ success: false, error: 'Trip ID is required' });
       }
 
+      // 1. Verify Ownership
       const { data: trip, error: fetchError } = await supabaseAdmin
         .from('trips')
-        .select('organizer_id')        .eq('id', tripId)
+        .select('organizer_id')
+        .eq('id', tripId)
         .single();
 
       if (fetchError || !trip) {
         return res.status(404).json({ success: false, error: 'Trip not found' });
       }
-
       if (trip.organizer_id !== userId) {
         return res.status(403).json({
           success: false,
@@ -257,6 +300,7 @@ export const tripController = {
         });
       }
 
+      // 2. Delete Trip (Cascade will handle related tables)
       const { error: deleteError } = await supabaseAdmin
         .from('trips')
         .delete()
