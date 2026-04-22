@@ -13,6 +13,14 @@ export interface Trip {
   organizer_id: string;
   name: string;
   destination: string;
+  
+  // ✅ NEW: Add these fields to match frontend and DB
+  start_location?: string;
+  destination_lat?: number;
+  destination_lng?: number;
+  start_lat?: number;
+  start_lng?: number;
+  
   start_date: string;
   end_date: string;
   budget: number;
