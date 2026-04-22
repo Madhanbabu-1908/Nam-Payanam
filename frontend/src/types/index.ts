@@ -11,6 +11,14 @@ export interface Trip {
   organizer_id: string;
   name: string;
   destination: string;
+  
+  // ✅ NEW: Add these fields for coordinates
+  destination_lat?: number;
+  destination_lng?: number;
+  start_location?: string;
+  start_lat?: number;
+  start_lng?: number;
+  
   start_date: string;
   end_date: string;
   budget: number;
