@@ -1,8 +1,16 @@
 import React, { useState } from 'react';
-import Map, { Marker } from 'react-map-gl';
-import maplibregl from 'maplibre-gl';
-import 'maplibre-gl/dist/maplibre-gl.css';
-import { Search, X } from 'lucide-react';
+import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Fix Leaflet Default Icon
+const defaultIcon = new L.Icon({
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+});
 
 interface LocationPickerProps {
   onSelect: (lat: number, lng: number, name: string) => void;
@@ -11,64 +19,106 @@ interface LocationPickerProps {
   label: string;
 }
 
-const MAP_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
+// Component to handle Map Clicks + Reverse Geocoding
+function LocationMarker({ onSelect }: { onSelect: (lat: number, lng: number, name: string) => void }) {
+  const [position, setPosition] = useState<L.LatLng | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const map = useMapEvents({
+    async click(e) {
+      setPosition(e.latlng);
+      setLoading(true);
+
+      try {
+        // Reverse geocode using Nominatim
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${e.latlng.lat}&lon=${e.latlng.lng}&zoom=10&addressdetails=1`,
+          {
+            headers: {
+              'User-Agent': 'Nam-Payanam-App/1.0'
+            }
+          }
+        );
+        const data = await res.json();
+
+        let displayName = `${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
+
+        if (data && data.address) {
+          const addr = data.address;
+          // Try to get most relevant name: city > town > village > county
+          displayName = 
+            addr.city ||             addr.town || 
+            addr.village || 
+            addr.county || 
+            addr.state_district || 
+            addr.state || 
+            displayName;
+        }
+
+        onSelect(e.latlng.lat, e.latlng.lng, displayName);
+      } catch (err) {
+        console.error("Reverse geocoding failed:", err);
+        onSelect(e.latlng.lat, e.latlng.lng, `${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`);
+      } finally {
+        setLoading(false);
+      }
+    },
+    locationfound(e) {
+      setPosition(e.latlng);
+      map.flyTo(e.latlng, map.getZoom());
+    },
+  });
+
+  return position === null ? null : (
+    <Marker position={position} icon={defaultIcon}>
+      {loading && (
+        <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-white dark:bg-slate-800 px-3 py-1 rounded-full text-xs font-bold shadow-md animate-pulse">
+          Fetching location...
+        </div>
+      )}
+    </Marker>
+  );
+}
 
 export default function LocationPicker({ onSelect, initialLat, initialLng, label }: LocationPickerProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState<any[]>([]);
-  const [selectedLoc, setSelectedLoc] = useState<{ lat: number; lng: number; name: string } | null>(null);
+  const center: [number, number] = initialLat && initialLng ? [initialLat, initialLng] : [20.5937, 78.9629]; // India Center
 
-  const viewState = {
-    longitude: initialLng || 78.9629,
-    latitude: initialLat || 20.5937,
-    zoom: 5
-  };
-
+  // Handle Search via Nominatim API
   const handleSearch = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
     setSearchQuery(query);
+
     if (query.length < 3) {
       setSuggestions([]);
       return;
     }
+
     try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=5&addressdetails=1`);
-      const data = await res.json();
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=5&addressdetails=1`);      const data = await res.json();
       setSuggestions(data);
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const selectSuggestion = (item: any) => {
     const lat = parseFloat(item.lat);
     const lng = parseFloat(item.lon);
-    const name = item.display_name.split(',')[0];
+    const name = item.display_name.split(',')[0]; // Get short name
     
-    setSelectedLoc({ lat, lng, name });
+    onSelect(lat, lng, name);
     setSearchQuery(name);
     setSuggestions([]);
-    onSelect(lat, lng, name);
-  };
-  const handleMapClick = (e: any) => {
-    const { lng, lat } = e.lngLat;
-    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
-      .then(res => res.json())
-      .then(data => {
-        const name = data.address.city || data.address.town || data.address.village || `${lat.toFixed(2)}, ${lng.toFixed(2)}`;
-        setSelectedLoc({ lat, lng, name });
-        setSearchQuery(name);
-        onSelect(lat, lng, name);
-      })
-      .catch(() => {
-        setSelectedLoc({ lat, lng, name: `${lat.toFixed(2)}, ${lng.toFixed(2)}` });
-        onSelect(lat, lng, `${lat.toFixed(2)}, ${lng.toFixed(2)}`);
-      });
   };
 
   return (
     <div className="relative w-full h-[400px] rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-lg">
-      <div className="absolute top-4 left-4 right-4 z-10">
+      
+      {/* Search Bar Overlay */}
+      <div className="absolute top-4 left-4 right-4 z-[1000]">
         <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md flex items-center p-2">
-          <Search className="text-slate-400 ml-2" size={20} />
           <input 
             type="text" 
             placeholder={`Search for ${label}...`} 
@@ -76,9 +126,12 @@ export default function LocationPicker({ onSelect, initialLat, initialLng, label
             onChange={handleSearch}
             className="flex-1 bg-transparent outline-none text-slate-800 dark:text-white px-2"
           />
-          {searchQuery && <button onClick={() => {setSearchQuery(''); setSuggestions([])}}><X size={18} className="text-slate-400"/></button>}
+          {searchQuery && (
+            <button onClick={() => {setSearchQuery(''); setSuggestions([])}} className="p-2 text-slate-400 hover:text-slate-600">✕</button>
+          )}
         </div>
         
+        {/* Suggestions Dropdown */}
         {suggestions.length > 0 && (
           <div className="bg-white dark:bg-slate-800 mt-2 rounded-xl shadow-lg max-h-60 overflow-y-auto">
             {suggestions.map((item, idx) => (
@@ -92,23 +145,16 @@ export default function LocationPicker({ onSelect, initialLat, initialLng, label
               </button>
             ))}
           </div>
-        )}
-      </div>
+        )}      </div>
 
-      <Map
-        {...viewState}        style={{ width: '100%', height: '100%' }}
-        mapStyle={MAP_STYLE}
-        mapLib={maplibregl as any} // ✅ Fixed Type Error
-        onClick={handleMapClick}
-      >
-        {selectedLoc && (
-          <Marker longitude={selectedLoc.lng} latitude={selectedLoc.lat} anchor="bottom">
-            <div className="bg-indigo-600 text-white p-1.5 rounded-full shadow-lg cursor-pointer">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-            </div>
-          </Marker>
-        )}
-      </Map>
+      {/* The Map */}
+      <MapContainer center={center} zoom={5} className="w-full h-full z-0">
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        <LocationMarker onSelect={onSelect} />
+      </MapContainer>
     </div>
   );
 }
