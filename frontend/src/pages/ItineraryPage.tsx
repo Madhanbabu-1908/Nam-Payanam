@@ -43,12 +43,13 @@ export default function ItineraryPage() {
   if (loading) return <div className="h-screen flex items-center justify-center"><div className="animate-spin h-8 w-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full"></div></div>;
 
   // Group items by day
-  const grouped = items.reduce((acc, item) => {
-    const day = item.day_number || 1;
-    if (!acc[day]) acc[day] = [];
-    acc[day].push(item);
-    return acc;
-  }, {} as Record<number, any[]>);
+  // Group items by day
+const grouped: Record<number, any[]> = items.reduce((acc, item) => {
+  const day = item.day_number || 1;
+  if (!acc[day]) acc[day] = [];
+  acc[day].push(item);
+  return acc;
+}, {} as Record<number, any[]>);
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-20">
       {/* Header */}
@@ -84,7 +85,7 @@ export default function ItineraryPage() {
             </div>
           ) : (
             /* Itinerary List */
-            Object.entries(grouped).map(([day, dayItems]: [string, any[]]) => (
+            Object.entries(grouped).map(([day, dayItems]) => (
               <div key={day} className="animate-fade-in">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="bg-indigo-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shadow-md">
