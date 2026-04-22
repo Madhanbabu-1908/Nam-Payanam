@@ -1,13 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
+import type { Feature, LineString } from "geojson";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 type Trip = {
   id: string;
-  route?: {
-    type: "LineString";
-    coordinates: [number, number][];
-  };
+  route?: LineString; // ✅ Strong GeoJSON typing
 };
 
 type Location = {
@@ -40,13 +38,13 @@ export default function PublicTrackPage() {
       .catch(err => console.error("Fetch trip failed:", err));
   }, [tripId]);
 
-  // 🗺️ Initialize MapLibre
+  // 🗺️ Initialize Map
   useEffect(() => {
     if (!mapContainer.current) return;
 
     mapRef.current = new maplibregl.Map({
       container: mapContainer.current,
-      style: "https://demotiles.maplibre.org/style.json", // ✅ FREE STYLE
+      style: "https://demotiles.maplibre.org/style.json",
       center: [78.9629, 20.5937],
       zoom: 4,
     });
@@ -58,18 +56,22 @@ export default function PublicTrackPage() {
 
   // 🚀 Draw Route + Auto Fit
   useEffect(() => {
-    if (!trip || !trip.route || !mapRef.current) return;
+    if (!trip?.route || !mapRef.current) return;
 
     const map = mapRef.current;
     const coords = trip.route.coordinates;
 
+    // ✅ Strongly typed GeoJSON Feature
+    const routeFeature: Feature<LineString> = {
+      type: "Feature",
+      properties: {},
+      geometry: trip.route,
+    };
+
     if (!map.getSource("route")) {
       map.addSource("route", {
         type: "geojson",
-        data: {
-          type: "Feature",
-          geometry: trip.route,
-        },
+        data: routeFeature, // ✅ No TS error
       });
 
       map.addLayer({
@@ -83,50 +85,44 @@ export default function PublicTrackPage() {
       });
     }
 
-    // ✅ Auto fit route
+    // ✅ Auto fit bounds
     const bounds = new maplibregl.LngLatBounds();
     coords.forEach(c => bounds.extend(c));
     map.fitBounds(bounds, { padding: 50 });
 
-    // 📏 Calculate distance
+    // 📏 Distance calculation
     let total = 0;
     for (let i = 1; i < coords.length; i++) {
       total += getDistance(coords[i - 1], coords[i]);
     }
     setDistance(total);
 
-    // ⏱ ETA (avg speed 40km/h)
+    // ⏱ ETA (avg 40km/h)
     setEta(total / 40);
 
   }, [trip]);
 
-  // 🚗 WebSocket real-time tracking
+  // 🚗 WebSocket tracking
   useEffect(() => {
     if (!mapRef.current || !tripId) return;
 
     const socket = new WebSocket(`${WS_URL}/track/${tripId}`);
 
-    socket.onopen = () => {
-      console.log("✅ WebSocket connected");
-    };
+    socket.onopen = () => console.log("✅ WebSocket connected");
 
     socket.onmessage = (event) => {
       const loc: Location = JSON.parse(event.data);
       animateVehicle(loc);
     };
 
-    socket.onerror = (err) => {
-      console.error("❌ WebSocket error:", err);
-    };
+    socket.onerror = (err) => console.error("❌ WS error:", err);
 
-    socket.onclose = () => {
-      console.log("🔌 WebSocket disconnected");
-    };
+    socket.onclose = () => console.log("🔌 WebSocket closed");
 
     return () => socket.close();
   }, [tripId]);
 
-  // 🚗 Smooth vehicle animation
+  // 🚗 Smooth animation
   const animateVehicle = (target: Location) => {
     if (!mapRef.current) return;
 
@@ -149,8 +145,8 @@ export default function PublicTrackPage() {
     const animate = (time: number) => {
       const progress = Math.min((time - startTime) / duration, 1);
 
-      const lng = start.lng + (target.lng - start.lng) * progress;
-      const lat = start.lat + (target.lat - start.lat) * progress;
+      const lng = start.lng + (target.lng - target.lng) * 0 + (target.lng - start.lng) * progress;
+      const lat = start.lat + (target.lat - target.lat) * 0 + (target.lat - start.lat) * progress;
 
       vehicleMarker.current!.setLngLat([lng, lat]);
 
@@ -160,7 +156,7 @@ export default function PublicTrackPage() {
     requestAnimationFrame(animate);
   };
 
-  // 📏 Distance (Haversine)
+  // 📏 Haversine
   const getDistance = (a: [number, number], b: [number, number]) => {
     const R = 6371;
     const dLat = (b[1] - a[1]) * Math.PI / 180;
@@ -176,7 +172,7 @@ export default function PublicTrackPage() {
     return 2 * R * Math.atan2(Math.sqrt(val), Math.sqrt(1 - val));
   };
 
-  // 🔗 Share link
+  // 🔗 Share
   const share = () => {
     navigator.clipboard.writeText(window.location.href);
     alert("Tracking link copied!");
