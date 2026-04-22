@@ -1,18 +1,14 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import Map, { Marker, NavigationControl, ScaleControl } from 'react-map-gl';
+import Map, { Marker, NavigationControl, ScaleControl, Source, Layer } from 'react-map-gl';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { api } from '../config/api';
 import { ArrowLeft, MapPin, Clock, Gauge, Navigation, AlertTriangle, PauseCircle } from 'lucide-react';
 
-// ✅ Free Vector Tile Styles (No API Key)
-const MAP_STYLES = {
-  light: 'https://tiles.openfreemap.org/styles/liberty',
-  dark: 'https://tiles.openfreemap.org/styles/dark-matter',
-};
+const MAP_STYLE = 'https://tiles.openfreemap.org/styles/dark-matter';
 
-// ✅ Speedometer Component (Same as before)
+// ✅ Speedometer Component
 const Speedometer = ({ speed }: { speed: number }) => {
   const maxSpeed = 120;
   const percentage = Math.min((speed / maxSpeed) * 100, 100);
@@ -47,11 +43,11 @@ const SafetyAlert = ({ type, message }: { type: 'speed' | 'stop' | 'deviation', 
 };
 
 export default function LiveMapPage() {
-  const { tripId } = useParams();  const navigate = useNavigate();
+  const { tripId } = useParams();
+  const navigate = useNavigate();
   const mapRef = useRef<any>(null);
   
-  const [currentLocation, setCurrentLocation] = useState<[number, number] | null>(null);
-  const [routeGeoJSON, setRouteGeoJSON] = useState<any>(null);
+  const [currentLocation, setCurrentLocation] = useState<[number, number] | null>(null); // [lng, lat] for MapLibre  const [routeGeoJSON, setRouteGeoJSON] = useState<any>(null);
   const [traveledGeoJSON, setTraveledGeoJSON] = useState<any>(null);
   const [startLoc, setStartLoc] = useState<{ coords: [number, number], name: string } | null>(null);
   const [destLoc, setDestLoc] = useState<{ coords: [number, number], name: string } | null>(null);
@@ -62,7 +58,7 @@ export default function LiveMapPage() {
   
   const stopTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Haversine Distance
+  // Haversine Distance (Lat/Lng)
   const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371;
     const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -83,11 +79,13 @@ export default function LiveMapPage() {
 
         if (tripRes.data.success) {
           const t = tripRes.data.data;
-          if (t.start_lat && t.start_lng) setStartLoc({ coords: [t.start_lat, t.start_lng], name: t.start_location || 'Start' });
-          if (t.destination_lat && t.destination_lng) setDestLoc({ coords: [t.destination_lat, t.destination_lng], name: t.destination || 'Destination' });
+          // Convert Backend [lat, lng] to MapLibre [lng, lat]
+          if (t.start_lat && t.start_lng) setStartLoc({ coords: [t.start_lng, t.start_lat], name: t.start_location || 'Start' });
+          if (t.destination_lat && t.destination_lng) setDestLoc({ coords: [t.destination_lng, t.destination_lat], name: t.destination || 'Destination' });
           
           if (t.route_data && t.route_data.length > 1) {
-            const coords = t.route_data.map((c: [number, number]) => [c[1], c[0]]); // [lng, lat] for GeoJSON
+            // Convert Route Data to GeoJSON [lng, lat]
+            const coords = t.route_data.map((c: [number, number]) => [c[1], c[0]]); 
             setRouteGeoJSON({ type: 'Feature', geometry: { type: 'LineString', coordinates: coords } });
             
             let dist = 0;
@@ -96,9 +94,9 @@ export default function LiveMapPage() {
           }
         }
 
-        if (liveRes.data.success && liveRes.data.data?.currentLocation) {          const { latitude, longitude, speed } = liveRes.data.data.currentLocation;
-          const loc: [number, number] = [longitude, latitude]; // [lng, lat]
-          setCurrentLocation(loc);
+        if (liveRes.data.success && liveRes.data.data?.currentLocation) {
+          const { latitude, longitude, speed } = liveRes.data.data.currentLocation;
+          const loc: [number, number] = [longitude, latitude]; // [lng, lat]          setCurrentLocation(loc);
           setSpeed(speed || 0);
           
           // Update traveled path
@@ -145,9 +143,9 @@ export default function LiveMapPage() {
       if (stopTimerRef.current) { clearTimeout(stopTimerRef.current); stopTimerRef.current = null; }
     }
 
-    if (routeGeoJSON) {      let minD = Infinity;
-      routeGeoJSON.geometry.coordinates.forEach((c: [number, number]) => {
-        minD = Math.min(minD, getDistance(currentLocation[1], currentLocation[0], c[1], c[0]));
+    if (routeGeoJSON) {
+      let minD = Infinity;
+      routeGeoJSON.geometry.coordinates.forEach((c: [number, number]) => {        minD = Math.min(minD, getDistance(currentLocation[1], currentLocation[0], c[1], c[0]));
       });
       if (minD > 0.5) newAlerts.push({ type: 'deviation', message: '📍 Off Route' });
     }
@@ -185,25 +183,24 @@ export default function LiveMapPage() {
         ref={mapRef}
         initialViewState={{ longitude: 78.47, latitude: 12.05, zoom: 6 }}
         style={{ width: '100%', height: '100%' }}
-        mapStyle={MAP_STYLES.dark}
+        mapStyle={MAP_STYLE}
         mapLib={maplibregl}
         attributionControl={false}
-        interactiveLayerIds={[]}
       >
         <NavigationControl position="top-right" />
         <ScaleControl position="bottom-left" />
 
         {/* Full Route (Gray) */}
-        {routeGeoJSON && (          <source id="route" type="geojson" data={routeGeoJSON}>
-            <layer id="route-line" type="line" paint={{ 'line-color': '#4b5563', 'line-width': 4, 'line-opacity': 0.6, 'line-cap': 'round' }} />
-          </source>
-        )}
+        {routeGeoJSON && (
+          <Source id="route" type="geojson" data={routeGeoJSON}>
+            <Layer id="route-line" type="line" paint={{ 'line-color': '#4b5563', 'line-width': 4, 'line-opacity': 0.6, 'line-cap': 'round' }} />
+          </Source>        )}
 
         {/* Traveled Path (Indigo) */}
         {traveledGeoJSON && (
-          <source id="traveled" type="geojson" data={traveledGeoJSON}>
-            <layer id="traveled-line" type="line" paint={{ 'line-color': '#6366f1', 'line-width': 5, 'line-opacity': 0.9, 'line-cap': 'round' }} />
-          </source>
+          <Source id="traveled" type="geojson" data={traveledGeoJSON}>
+            <Layer id="traveled-line" type="line" paint={{ 'line-color': '#6366f1', 'line-width': 5, 'line-opacity': 0.9, 'line-cap': 'round' }} />
+          </Source>
         )}
 
         {/* Start Marker */}
@@ -244,9 +241,9 @@ export default function LiveMapPage() {
           {alerts.map((a, i) => <SafetyAlert key={i} type={a.type} message={a.message} />)}
         </div>
       )}
+
       {/* Bottom Dashboard */}
-      {currentLocation && (
-        <div className="absolute bottom-6 left-4 right-4 z-20 animate-fade-in">
+      {currentLocation && (        <div className="absolute bottom-6 left-4 right-4 z-20 animate-fade-in">
           <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 p-5 max-w-md mx-auto">
             <div className="flex justify-between items-start mb-4 border-b border-slate-100 dark:border-slate-700 pb-4">
               <div>
