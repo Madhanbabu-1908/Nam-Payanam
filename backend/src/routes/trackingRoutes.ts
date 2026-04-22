@@ -1,27 +1,49 @@
 import { Router } from 'express';
-import { trackingController } from '../controllers/trackingController';
 import { authMiddleware } from '../middleware/authMiddleware';
+import { supabaseAdmin } from '../config/db';
+import { AuthRequest } from '../middleware/authMiddleware';
+import { Response, NextFunction } from 'express';
 
 const router = Router();
+router.use(authMiddleware);
 
-/**
- * Protected Routes (Organizer Only)
- * Requires valid JWT in Authorization header
- */
-// Generate a new tracking token for a specific trip
-router.post('/tokens/:tripId', authMiddleware, trackingController.createToken);
+// Push location
+router.post('/trips/:tripId/location', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { tripId } = req.params;
+    const { latitude, longitude, speed = 0, heading = 0 } = req.body;
+    if (!latitude || !longitude) return res.status(400).json({ success: false, error: 'lat/lng required' });
+    const { error } = await supabaseAdmin.from('trip_tracking').insert({
+      trip_id: tripId, user_id: req.user!.id, latitude, longitude, speed, heading
+    });
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err: any) { next(err); }
+});
 
-// Get live location for a trip (used by Dashboard LiveMapPage)
-router.get('/live/:tripId', authMiddleware, trackingController.getLiveLocation);
+// Get latest location
+router.get('/trips/:tripId/location', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { tripId } = req.params;
+    const { data, error } = await supabaseAdmin.from('trip_tracking')
+      .select('*').eq('trip_id', tripId)
+      .order('recorded_at', { ascending: false }).limit(1).single();
+    if (error && error.code !== 'PGRST116') throw error;
+    res.json({ success: true, data: data || null });
+  } catch (err: any) { next(err); }
+});
 
-/**
- * Public Routes (Driver & Viewers)
- * No Authentication Required, secured by Token in URL/Params
- */
-// Driver pushes GPS coordinates
-router.post('/push/:token', trackingController.pushLocation);
-
-// Public viewer fetches latest location
-router.get('/public/:token', trackingController.getPublicLocation);
+// Get path (last 200 points)
+router.get('/trips/:tripId/path', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { tripId } = req.params;
+    const { data, error } = await supabaseAdmin.from('trip_tracking')
+      .select('latitude,longitude,speed,recorded_at')
+      .eq('trip_id', tripId)
+      .order('recorded_at').limit(200);
+    if (error) throw error;
+    res.json({ success: true, data: data || [] });
+  } catch (err: any) { next(err); }
+});
 
 export default router;

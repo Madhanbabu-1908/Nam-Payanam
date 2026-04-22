@@ -1,12 +1,14 @@
 import { Router } from 'express';
 import { aiController } from '../controllers/aiController';
 import { authMiddleware } from '../middleware/authMiddleware';
-import { requireOrganizer } from '../middleware/roleMiddleware';
 
 const router = Router();
 router.use(authMiddleware);
 
-// POST /api/ai/regenerate/:tripId
-router.post('/regenerate/:tripId', requireOrganizer, aiController.regenerateItinerary);
+router.post('/trips/:tripId/regenerate', aiController.regenerateItinerary);
+router.post('/trips/:tripId/chat',       aiController.chat);
+router.get('/trips/:tripId/chat',        aiController.getChatHistory);
+router.get('/trips/:tripId/budget',      aiController.analyzeBudget);
+router.get('/trips/:tripId/summary',     aiController.generateSummary);
 
 export default router;
