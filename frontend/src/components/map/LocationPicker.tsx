@@ -1,11 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
-import { GeoSearchControl, OpenStreetMapProvider } from 'leaflet-geosearch';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import 'leaflet-geosearch/dist/geosearch.css';
 
-// Fix Leaflet Icon
+// Fix Leaflet Default Icon
 const defaultIcon = new L.Icon({
   iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
@@ -47,9 +45,9 @@ export default function LocationPicker({ onSelect, initialLat, initialLng, label
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const center: [number, number] = initialLat && initialLng ? [initialLat, initialLng] : [20.5937, 78.9629]; // India Center
 
-  // Handle Search via Nominatim API  const handleSearch = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const query = e.target.value;
-    setSearchQuery(query);
+  // Handle Search via Nominatim API
+  const handleSearch = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const query = e.target.value;    setSearchQuery(query);
 
     if (query.length < 3) {
       setSuggestions([]);
@@ -96,9 +94,9 @@ export default function LocationPicker({ onSelect, initialLat, initialLng, label
         {/* Suggestions Dropdown */}
         {suggestions.length > 0 && (
           <div className="bg-white dark:bg-slate-800 mt-2 rounded-xl shadow-lg max-h-60 overflow-y-auto">
-            {suggestions.map((item, idx) => (              <button 
-                key={idx} 
-                onClick={() => selectSuggestion(item)}
+            {suggestions.map((item, idx) => (
+              <button 
+                key={idx}                 onClick={() => selectSuggestion(item)}
                 className="w-full text-left p-3 hover:bg-slate-50 dark:hover:bg-slate-700 border-b border-slate-100 dark:border-slate-700 last:border-0"
               >
                 <p className="font-bold text-sm text-slate-800 dark:text-white">{item.display_name.split(',')[0]}</p>
