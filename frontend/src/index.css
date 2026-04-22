@@ -1,54 +1,215 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Sora:wght@600;700;800;900&family=JetBrains+Mono:wght@500;600&family=Noto+Sans+Tamil:wght@400;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ── Design Tokens ─────────────────────────────────────────── */
+:root {
+  --brand:      #FF6B35;
+  --brand-dark: #E55A25;
+  --brand-glow: rgba(255,107,53,0.35);
+  --surface:    #FFFFFF;
+  --bg:         #F7F8FA;
+  --border:     #EAECF0;
+  --text:       #111827;
+  --muted:      #6B7280;
+  --jade:       #10B981;
+  --sky:        #0EA5E9;
+  --rose:       #F43F5E;
+  --amber:      #F59E0B;
+  --radius:     16px;
+}
+.dark {
+  --surface:  #1C1C27;
+  --bg:       #13131A;
+  --border:   #2D2D3D;
+  --text:     #F1F5F9;
+  --muted:    #94A3B8;
+}
+
+/* ── Base ──────────────────────────────────────────────────── */
+* { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
 body {
-  margin: 0;
-  font-family: 'DM Sans', sans-serif;
-  background: #f8fafc;
-  color: #1e293b;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
   -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
 }
 
-/* Dark Mode Support */
-.dark body {
-  background: #0f172a;
-  color: #f1f5f9;
-}
+/* ── Typography ────────────────────────────────────────────── */
+.font-display { font-family: 'Sora', sans-serif; }
+.font-mono    { font-family: 'JetBrains Mono', monospace; }
+.font-tamil   { font-family: 'Noto Sans Tamil', sans-serif; }
 
-/* Glassmorphism Utility */
+/* ── Layout Components ─────────────────────────────────────── */
+.page { @apply min-h-screen bg-[var(--bg)] pb-24; }
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  @apply shadow-sm;
+}
+.card-hover { @apply card transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98]; }
 .glass {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
 }
-
 .dark .glass {
-  background: rgba(15, 23, 42, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(28,28,39,0.8);
 }
 
-/* ✅ CRITICAL: Fix for Leaflet Maps */
+/* ── Buttons ───────────────────────────────────────────────── */
+.btn-primary {
+  @apply bg-[var(--brand)] text-white font-bold rounded-xl px-5 py-3
+         transition-all duration-150 active:scale-95 disabled:opacity-50
+         disabled:cursor-not-allowed flex items-center justify-center gap-2;
+  box-shadow: 0 4px 14px var(--brand-glow);
+}
+.btn-primary:hover:not(:disabled) { background: var(--brand-dark); }
+.btn-secondary {
+  @apply bg-[var(--surface)] border border-[var(--border)] text-[var(--text)]
+         font-semibold rounded-xl px-5 py-3 transition-all duration-150 active:scale-95
+         flex items-center justify-center gap-2;
+}
+.btn-ghost {
+  @apply text-[var(--muted)] font-semibold rounded-xl px-4 py-2.5
+         transition-all duration-150 active:scale-95 hover:bg-[var(--bg)]
+         flex items-center justify-center gap-2;
+}
+.btn-danger {
+  @apply bg-red-500 text-white font-bold rounded-xl px-5 py-3
+         transition-all duration-150 active:scale-95
+         flex items-center justify-center gap-2;
+}
+.btn-icon {
+  @apply w-10 h-10 flex items-center justify-center rounded-xl
+         transition-all duration-150 active:scale-90;
+}
+
+/* ── Inputs ────────────────────────────────────────────────── */
+.input {
+  @apply w-full bg-[var(--bg)] border border-[var(--border)] rounded-xl
+         px-4 py-3 text-sm text-[var(--text)] placeholder-[var(--muted)]
+         focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30
+         focus:border-[var(--brand)] transition-all duration-150;
+}
+.label { @apply text-xs font-bold text-[var(--muted)] uppercase tracking-wider mb-1.5 block; }
+
+/* ── Badges ────────────────────────────────────────────────── */
+.badge { @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold; }
+.badge-brand  { @apply badge bg-orange-100 text-orange-700; }
+.badge-jade   { @apply badge bg-emerald-100 text-emerald-700; }
+.badge-sky    { @apply badge bg-sky-100 text-sky-700; }
+.badge-rose   { @apply badge bg-red-100 text-red-600; }
+.badge-amber  { @apply badge bg-amber-100 text-amber-700; }
+.badge-indigo { @apply badge bg-indigo-100 text-indigo-700; }
+.badge-slate  { @apply badge bg-slate-100 text-slate-600; }
+.badge-ai     { @apply badge bg-violet-100 text-violet-700; }
+
+/* ── Bottom Sheet ──────────────────────────────────────────── */
+.sheet-overlay {
+  @apply fixed inset-0 bg-black/50 backdrop-blur-sm z-40;
+  animation: fadeIn 0.2s ease-out;
+}
+.sheet {
+  @apply fixed bottom-0 left-0 right-0 z-50 overflow-y-auto;
+  background: var(--surface);
+  border-radius: 24px 24px 0 0;
+  max-height: 92dvh;
+  animation: slideUp 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  box-shadow: 0 -8px 40px rgba(0,0,0,0.12);
+}
+.sheet-handle {
+  @apply w-12 h-1.5 bg-[var(--border)] rounded-full mx-auto mt-3 mb-2;
+}
+
+/* ── Stats Card ────────────────────────────────────────────── */
+.stat-card {
+  @apply card px-4 py-3.5 flex flex-col gap-0.5;
+}
+
+/* ── Category pill ─────────────────────────────────────────── */
+.cat-pill {
+  @apply flex flex-col items-center gap-1 px-3 py-2.5 rounded-2xl border-2
+         text-xs font-bold transition-all duration-150 active:scale-95 cursor-pointer;
+}
+.cat-active   { @apply border-[var(--brand)] bg-orange-50 text-[var(--brand)]; }
+.cat-inactive { border-color: var(--border); @apply text-[var(--muted)] hover:border-[var(--brand)]/40; }
+
+/* ── Map ───────────────────────────────────────────────────── */
 .leaflet-container {
   width: 100%;
   height: 100%;
-  min-height: 100vh; /* Force full screen height */
   z-index: 0;
-  outline: none;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+}
+.leaflet-popup-content-wrapper {
+  border-radius: 14px !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.15) !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+}
+.leaflet-control-zoom {
+  border: none !important;
+  border-radius: 12px !important;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+}
+.leaflet-control-zoom a {
+  border: none !important;
+  color: var(--text) !important;
+  font-weight: 700;
 }
 
-/* Smooth Scroll */
-html { scroll-behavior: smooth; }
-
-/* Custom Animations */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+/* ── Skeleton ──────────────────────────────────────────────── */
+.skeleton {
+  @apply rounded-xl;
+  background: linear-gradient(90deg, var(--border) 25%, var(--bg) 50%, var(--border) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
 }
 
-.animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
+/* ── AI Chat ───────────────────────────────────────────────── */
+.chat-bubble-user {
+  @apply ml-auto max-w-[80%] bg-[var(--brand)] text-white rounded-2xl rounded-br-sm px-4 py-3 text-sm;
+}
+.chat-bubble-ai {
+  @apply mr-auto max-w-[80%] card px-4 py-3 text-sm text-[var(--text)] rounded-2xl rounded-bl-sm;
+}
 
-/* Hide Scrollbar but keep functionality */
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+/* ── Progress Bar ──────────────────────────────────────────── */
+.progress-track {
+  @apply h-2.5 rounded-full overflow-hidden;
+  background: var(--border);
+}
+.progress-fill {
+  @apply h-full rounded-full transition-all duration-700 ease-out;
+  background: linear-gradient(90deg, var(--brand), var(--jade));
+}
+
+/* ── Utilities ─────────────────────────────────────────────── */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+.pb-safe  { padding-bottom: max(env(safe-area-inset-bottom, 16px), 16px); }
+.pt-safe  { padding-top: env(safe-area-inset-top, 0px); }
+.text-brand { color: var(--brand); }
+.bg-brand   { background: var(--brand); }
+.border-brand { border-color: var(--brand); }
+.live-dot { @apply w-2.5 h-2.5 rounded-full bg-jade animate-pulse; }
+
+/* ── Keyframes ─────────────────────────────────────────────── */
+@keyframes fadeIn    { from{opacity:0}        to{opacity:1} }
+@keyframes slideUp   { from{transform:translateY(24px);opacity:0} to{transform:translateY(0);opacity:1} }
+@keyframes slideIn   { from{transform:translateX(-100%)} to{transform:translateX(0)} }
+@keyframes shimmer   { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+@keyframes popIn     { 0%{transform:scale(0.8);opacity:0} 60%{transform:scale(1.05)} 100%{transform:scale(1);opacity:1} }
+@keyframes pingRing  { 75%,100%{transform:scale(2);opacity:0} }
+
+.animate-fade-in   { animation: fadeIn 0.3s ease-out; }
+.animate-slide-up  { animation: slideUp 0.35s cubic-bezier(0.34,1.56,0.64,1); }
+.animate-slide-in  { animation: slideIn 0.3s cubic-bezier(0.34,1.56,0.64,1); }
+.animate-pop       { animation: popIn 0.3s ease-out; }
+.animate-ping-ring { animation: pingRing 1.5s cubic-bezier(0,0,0.2,1) infinite; }
