@@ -24,8 +24,7 @@ export default function ItineraryPage() {
     
     Promise.all([
       api.get(`/trips/${tripId}`),
-      // ✅ FIX: Corrected syntax for fallback empty response
-      api.get(`/itinerary/trip/${tripId}`).catch(() => ({ data: { success: true, data: [] } }))
+      api.get(`/itinerary/trip/${tripId}`).catch(() => ({  { success: true,  [] } }))
     ]).then(([tripRes, itemRes]) => {
       setTrip(tripRes.data.data);
       setItems(itemRes.data.data || []);
@@ -83,7 +82,7 @@ export default function ItineraryPage() {
             </div>
           ) : (
             /* Itinerary List */
-            Object.entries(grouped).map(([day, dayItems]) => (
+            Object.entries(grouped).map(([day, dayItems]: [string, any[]]) => (
               <div key={day} className="animate-fade-in">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="bg-indigo-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shadow-md">
@@ -94,10 +93,10 @@ export default function ItineraryPage() {
                 </div>
                 
                 <div className="space-y-3 relative pl-4 border-l-2 border-indigo-100 dark:border-indigo-900 ml-4">
-                  {dayItems.map((item, idx) => (
+                  {dayItems.map((item: any, idx: number) => (
                     <div key={item.id || idx} className="relative bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 hover:shadow-md transition">
-                      <div className="absolute -left-[21px] top-4 w-3 h-3 bg-indigo-400 rounded-full border-2 border-white dark:border-slate-800"></div>                      <div className="flex justify-between items-start mb-2">
-                        <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded flex items-center gap-1">
+                      <div className="absolute -left-[21px] top-4 w-3 h-3 bg-indigo-400 rounded-full border-2 border-white dark:border-slate-800"></div>
+                      <div className="flex justify-between items-start mb-2">                        <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded flex items-center gap-1">
                           {getIcon(item.time_slot)} {item.time_slot}
                         </span>
                         {item.estimated_cost && <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">₹{item.estimated_cost}</span>}
