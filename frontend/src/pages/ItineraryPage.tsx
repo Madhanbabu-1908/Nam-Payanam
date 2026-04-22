@@ -23,14 +23,15 @@ export default function ItineraryPage() {
     if (!tripId) return;
     
     Promise.all([
-      api.get(`/trips/${tripId}`),
-      // ✅ FIX: Added 'data:' key to the fallback object
-      api.get(`/itinerary/trip/${tripId}`).catch(() => ({  { success: true, data: [] } }))
-    ]).then(([tripRes, itemRes]) => {
-      setTrip(tripRes.data.data);
-      setItems(itemRes.data.data || []);
-      setLoading(false);
-    }).catch(console.error);
+  api.get(`/trips/${tripId}`),
+  api.get(`/itinerary/trip/${tripId}`).catch(() => ({
+    data: { success: true, data: [] }
+  }))
+]).then(([tripRes, itemRes]) => {
+  setTrip(tripRes.data.data);
+  setItems(itemRes.data.data || []);
+  setLoading(false);
+}).catch(console.error);
   }, [tripId]);
 
   const handleExportPDF = () => {
