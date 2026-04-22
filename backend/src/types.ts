@@ -21,6 +21,11 @@ export interface Trip {
   start_lat?: number;
   start_lng?: number;
   
+  route?: {
+  type: "LineString";
+  coordinates: [number, number][];
+  };
+
   start_date: string;
   end_date: string;
   budget: number;
