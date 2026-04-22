@@ -3,7 +3,13 @@ import { AuthRequest } from '../middleware/authMiddleware';
 import { tripService } from '../services/tripService';
 import { aiService } from '../services/aiService';
 import { supabaseAdmin } from '../config/db';
-import { getRealRoute } from '../utils/routeUtils'; // ✅ Import the route helper
+import { getRealRoute } from '../utils/routeUtils';
+
+// ✅ Proper GeoJSON Type
+type GeoJSONLineString = {
+  type: "LineString";
+  coordinates: [number, number][];
+};
 
 export const tripController = {
   createTrip: async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -29,37 +35,43 @@ export const tripController = {
 
       const userId = req.user.id;
 
-      // ✅ 1. Calculate Real Driving Route if coordinates are provided
+      // ✅ 1. Calculate Real Driving Route
       let routeCoords: [number, number][] = [];
-      
+      let routeGeo: GeoJSONLineString | undefined = undefined;
+
       if (start_lat && start_lng && destination_lat && destination_lng) {
         try {
           routeCoords = await getRealRoute(
-            [parseFloat(start_lat), parseFloat(start_lng)], 
-            [parseFloat(destination_lat), parseFloat(destination_lng)]
+            // ✅ FIXED: Correct order (lng, lat)
+            [parseFloat(start_lng), parseFloat(start_lat)],
+            [parseFloat(destination_lng), parseFloat(destination_lat)]
           );
+
           console.log(`✅ Route calculated with ${routeCoords.length} points.`);
+
+          if (routeCoords.length > 0) {
+            routeGeo = {
+              type: "LineString",
+              coordinates: routeCoords as [number, number][]
+            };
+          }
+
         } catch (routeError) {
-          console.error("❌ Failed to calculate route, proceeding without it:", routeError);
-          // Continue without route if calculation fails
+          console.error("❌ Route calculation failed:", routeError);
         }
       }
 
-      // ✅ 2. Create Trip with Route Data
+      // ✅ 2. Create Trip
       const newTrip = await tripService.createTrip({
-        organizer_id: userId,        name,
+        organizer_id: userId,
+        name,
         destination,
         start_location,
         destination_lat: destination_lat ? Number(destination_lat) : undefined,
         destination_lng: destination_lng ? Number(destination_lng) : undefined,
         start_lat: start_lat ? Number(start_lat) : undefined,
         start_lng: start_lng ? Number(start_lng) : undefined,
-        route: routeCoords.length > 0
-  ? {
-      type: "LineString",
-      coordinates: routeCoords
-    }
-  : undefined, // ✅ Save the route array to DB
+        route: routeGeo, // ✅ FIXED TYPE
         start_date,
         end_date,
         budget: Number(budget),
@@ -67,7 +79,7 @@ export const tripController = {
         status: 'PLANNING',
       });
 
-      // 3. Add organizer to trip_members
+      // ✅ 3. Add Organizer as Member
       const { error: memberError } = await supabaseAdmin
         .from('trip_members')
         .insert({
@@ -77,12 +89,11 @@ export const tripController = {
         });
 
       if (memberError) {
-        // Rollback trip creation if member insert fails
         await supabaseAdmin.from('trips').delete().eq('id', newTrip.id);
         throw memberError;
       }
 
-      // 4. AI Itinerary Generation (if mode is AI)
+      // ✅ 4. AI Itinerary Generation
       if (mode === 'AI' && interests && start_location) {
         try {
           const days =
@@ -101,16 +112,17 @@ export const tripController = {
             startLocation: start_location
           });
 
-          const itemsToInsert = aiItems.map((item: any) => ({            ...item,
+          const itemsToInsert = aiItems.map((item: any) => ({
+            ...item,
             trip_id: newTrip.id
           }));
 
           if (itemsToInsert.length > 0) {
             await supabaseAdmin.from('itinerary_items').insert(itemsToInsert);
           }
+
         } catch (err: any) {
-          console.error("AI generation failed:", err.message);
-          // Don't fail the whole request if AI fails
+          console.error("⚠️ AI generation failed:", err.message);
         }
       }
 
@@ -150,7 +162,8 @@ export const tripController = {
         return res.json({ success: true, data: [] });
       }
 
-      const { data: trips, error } = await supabaseAdmin        .from('trips')
+      const { data: trips, error } = await supabaseAdmin
+        .from('trips')
         .select('*')
         .in('id', allTripIds)
         .order('created_at', { ascending: false });
@@ -199,6 +212,7 @@ export const tripController = {
       if (!trip) {
         return res.status(404).json({ success: false, error: 'Trip not found' });
       }
+
       const { data: existing } = await supabaseAdmin
         .from('trip_members')
         .select('id')
@@ -248,7 +262,8 @@ export const tripController = {
         return res.status(403).json({ success: false, error: 'Unauthorized' });
       }
 
-      const { data: updatedTrip, error } = await supabaseAdmin        .from('trips')
+      const { data: updatedTrip, error } = await supabaseAdmin
+        .from('trips')
         .update(req.body)
         .eq('id', tripId)
         .select()
