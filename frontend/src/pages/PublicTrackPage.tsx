@@ -32,6 +32,7 @@ export default function PublicTrackPage() {
           if (t.destination_lat && t.destination_lng) setDestLoc({ coords: [t.destination_lng, t.destination_lat], name: t.destination || 'Destination' });
           
           if (t.route_data && t.route_data.length > 1) {
+            // ✅ Completed the coordinate mapping here
             const coords = t.route_data.map((c: [number, number]) => [c[1], c[0]]);
             setRouteGeoJSON({ type: 'Feature', geometry: { type: 'LineString', coordinates: coords } });
           }
@@ -42,12 +43,12 @@ export default function PublicTrackPage() {
           setCurrentLocation([longitude, latitude]);
         }
       } catch (e) { 
-        console.error("Error fetching tracking data:", e); 
+        console.error("Error fetching tracking ", e); 
       }
     };
 
-    fetchData();
-    const interval = setInterval(fetchData, 5000);    return () => clearInterval(interval);
+    fetchData();    const interval = setInterval(fetchData, 5000);
+    return () => clearInterval(interval);
   }, [tripId]);
 
   useEffect(() => {
@@ -66,14 +67,15 @@ export default function PublicTrackPage() {
         initialViewState={{ longitude: 78.47, latitude: 12.05, zoom: 6 }}
         style={{ width: '100%', height: '100%' }}
         mapStyle={MAP_STYLE}
-        mapLib={maplibregl as any}
+        mapLib={maplibregl as any} // ✅ Type cast to fix MapLib error
         attributionControl={false}
       >
         <NavigationControl position="top-right" />
 
         {routeGeoJSON && (
           <Source id="route" type="geojson" data={routeGeoJSON}>
-            <Layer id="route-line" type="line" paint={{ 'line-color': '#4b5563', 'line-width': 4, 'line-opacity': 0.6, lineCap: 'round' }} />
+            {/* ✅ Fixed: Use 'line-cap' (kebab-case) for MapLibre v4 types */}
+            <Layer id="route-line" type="line" paint={{ 'line-color': '#4b5563', 'line-width': 4, 'line-opacity': 0.6, 'line-cap': 'round' }} />
           </Source>
         )}
 
@@ -94,9 +96,9 @@ export default function PublicTrackPage() {
         )}
 
         {currentLocation && (
-          <Marker longitude={currentLocation[0]} latitude={currentLocation[1]} anchor="center">
-            <div className="relative">
-              <div className="absolute inset-0 bg-indigo-500 rounded-full animate-ping opacity-40"></div>              <div className="relative bg-white dark:bg-slate-800 p-1.5 rounded-full shadow-xl border-2 border-indigo-500 flex items-center justify-center">
+          <Marker longitude={currentLocation[0]} latitude={currentLocation[1]} anchor="center">            <div className="relative">
+              <div className="absolute inset-0 bg-indigo-500 rounded-full animate-ping opacity-40"></div>
+              <div className="relative bg-white dark:bg-slate-800 p-1.5 rounded-full shadow-xl border-2 border-indigo-500 flex items-center justify-center">
                 <span className="text-lg">🚌</span>
               </div>
             </div>
