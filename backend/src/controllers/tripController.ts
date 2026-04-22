@@ -5,9 +5,6 @@ import { aiService } from '../services/aiService';
 import { supabaseAdmin } from '../config/db';
 
 export const tripController = {
-  /**
-   * POST /api/trips
-   */
   createTrip: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { 
@@ -31,28 +28,23 @@ export const tripController = {
 
       const userId = req.user.id;
 
-      console.log("📝 Creating Trip:", { name, destination, mode, userId });
-
-      // 1. Create Trip
       const newTrip = await tripService.createTrip({
         organizer_id: userId,
         name,
         destination,
         start_location,
-        destination_lat: destination_lat ? parseFloat(destination_lat) : null,
-        destination_lng: destination_lng ? parseFloat(destination_lng) : null,
-        start_lat: start_lat ? parseFloat(start_lat) : null,
-        start_lng: start_lng ? parseFloat(start_lng) : null,
+        destination_lat: destination_lat ? Number(destination_lat) : undefined,
+        destination_lng: destination_lng ? Number(destination_lng) : undefined,
+        start_lat: start_lat ? Number(start_lat) : undefined,
+        start_lng: start_lng ? Number(start_lng) : undefined,
         start_date,
         end_date,
-        budget: parseFloat(budget),
+        budget: Number(budget),
         mode,
         status: 'PLANNING',
       });
 
-      console.log("✅ Trip Created:", newTrip.id);
-
-      // 2. Add organizer
+      // Add organizer
       const { error: memberError } = await supabaseAdmin
         .from('trip_members')
         .insert({
@@ -66,7 +58,7 @@ export const tripController = {
         throw memberError;
       }
 
-      // 3. AI Itinerary
+      // AI Itinerary
       if (mode === 'AI' && interests && start_location) {
         try {
           const days =
@@ -78,7 +70,7 @@ export const tripController = {
           const aiItems = await aiService.generateItinerary({
             destination,
             days,
-            budget: parseFloat(budget),
+            budget: Number(budget),
             interests: Array.isArray(interests)
               ? interests
               : interests.split(',').map((s: string) => s.trim()),
@@ -91,21 +83,16 @@ export const tripController = {
           }));
 
           if (itemsToInsert.length > 0) {
-            const { error } = await supabaseAdmin
-              .from('itinerary_items')
-              .insert(itemsToInsert);
-
-            if (!error) console.log("✅ AI Itinerary Generated");
+            await supabaseAdmin.from('itinerary_items').insert(itemsToInsert);
           }
         } catch (err: any) {
-          console.error("⚠️ AI failed:", err.message);
+          console.error("AI generation failed:", err.message);
         }
       }
 
       res.status(201).json({ success: true, data: newTrip });
 
     } catch (error: any) {
-      console.error("❌ createTrip error:", error);
       next(error);
     }
   },
