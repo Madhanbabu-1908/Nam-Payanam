@@ -41,13 +41,15 @@ export default function PublicTrackPage() {
           const { latitude, longitude } = liveRes.data.data.currentLocation;
           setCurrentLocation([longitude, latitude]);
         }
-      } catch (e) { console.error(e); }
+      } catch (e) { 
+        console.error("Error fetching tracking data:", e); 
+      }
     };
+
     fetchData();
-    const interval = setInterval(fetchData, 5000);
-    return () => clearInterval(interval);
+    const interval = setInterval(fetchData, 5000);    return () => clearInterval(interval);
   }, [tripId]);
-  // Fit Bounds on Load
+
   useEffect(() => {
     if (mapRef.current && startLoc && destLoc) {
       const bounds = new maplibregl.LngLatBounds();
@@ -64,39 +66,43 @@ export default function PublicTrackPage() {
         initialViewState={{ longitude: 78.47, latitude: 12.05, zoom: 6 }}
         style={{ width: '100%', height: '100%' }}
         mapStyle={MAP_STYLE}
-        mapLib={maplibregl}
+        mapLib={maplibregl as any}
         attributionControl={false}
       >
         <NavigationControl position="top-right" />
 
         {routeGeoJSON && (
           <Source id="route" type="geojson" data={routeGeoJSON}>
-            <Layer id="route-line" type="line" paint={{ 'line-color': '#4b5563', 'line-width': 4, 'line-opacity': 0.6, 'line-cap': 'round' }} />
+            <Layer id="route-line" type="line" paint={{ 'line-color': '#4b5563', 'line-width': 4, 'line-opacity': 0.6, lineCap: 'round' }} />
           </Source>
         )}
 
         {startLoc && (
           <Marker longitude={startLoc.coords[0]} latitude={startLoc.coords[1]} anchor="bottom">
-            <div className="bg-emerald-500 text-white p-1.5 rounded-full shadow-lg"><MapPin size={18}/></div>
+            <div className="bg-emerald-500 text-white p-1.5 rounded-full shadow-lg flex items-center justify-center">
+              <MapPin size={18}/>
+            </div>
           </Marker>
         )}
 
         {destLoc && (
           <Marker longitude={destLoc.coords[0]} latitude={destLoc.coords[1]} anchor="bottom">
-            <div className="bg-red-500 text-white p-1.5 rounded-full shadow-lg"><MapPin size={18}/></div>
+            <div className="bg-red-500 text-white p-1.5 rounded-full shadow-lg flex items-center justify-center">
+              <MapPin size={18}/>
+            </div>
           </Marker>
         )}
 
         {currentLocation && (
           <Marker longitude={currentLocation[0]} latitude={currentLocation[1]} anchor="center">
             <div className="relative">
-              <div className="absolute inset-0 bg-indigo-500 rounded-full animate-ping opacity-40"></div>
-              <div className="relative bg-white dark:bg-slate-800 p-1.5 rounded-full shadow-xl border-2 border-indigo-500 flex items-center justify-center">
+              <div className="absolute inset-0 bg-indigo-500 rounded-full animate-ping opacity-40"></div>              <div className="relative bg-white dark:bg-slate-800 p-1.5 rounded-full shadow-xl border-2 border-indigo-500 flex items-center justify-center">
                 <span className="text-lg">🚌</span>
               </div>
             </div>
           </Marker>
-        )}      </Map>
+        )}
+      </Map>
       
       <div className="absolute top-4 left-4 z-20 bg-white/90 dark:bg-slate-800/90 backdrop-blur px-4 py-2 rounded-full shadow-lg border border-slate-200 dark:border-slate-700">
         <span className="font-bold text-sm text-slate-800 dark:text-white">Public Tracking</span>
