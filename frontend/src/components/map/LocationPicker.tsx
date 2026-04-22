@@ -18,7 +18,6 @@ export default function LocationPicker({ onSelect, initialLat, initialLng, label
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [selectedLoc, setSelectedLoc] = useState<{ lat: number; lng: number; name: string } | null>(null);
 
-  // Initial View State
   const viewState = {
     longitude: initialLng || 78.9629,
     latitude: initialLat || 20.5937,
@@ -47,11 +46,10 @@ export default function LocationPicker({ onSelect, initialLat, initialLng, label
     setSelectedLoc({ lat, lng, name });
     setSearchQuery(name);
     setSuggestions([]);
-    onSelect(lat, lng, name);  };
-
+    onSelect(lat, lng, name);
+  };
   const handleMapClick = (e: any) => {
     const { lng, lat } = e.lngLat;
-    // Reverse Geocode for Name
     fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
       .then(res => res.json())
       .then(data => {
@@ -68,8 +66,6 @@ export default function LocationPicker({ onSelect, initialLat, initialLng, label
 
   return (
     <div className="relative w-full h-[400px] rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-lg">
-      
-      {/* Search Bar */}
       <div className="absolute top-4 left-4 right-4 z-10">
         <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md flex items-center p-2">
           <Search className="text-slate-400 ml-2" size={20} />
@@ -83,7 +79,6 @@ export default function LocationPicker({ onSelect, initialLat, initialLng, label
           {searchQuery && <button onClick={() => {setSearchQuery(''); setSuggestions([])}}><X size={18} className="text-slate-400"/></button>}
         </div>
         
-        {/* Suggestions Dropdown */}
         {suggestions.length > 0 && (
           <div className="bg-white dark:bg-slate-800 mt-2 rounded-xl shadow-lg max-h-60 overflow-y-auto">
             {suggestions.map((item, idx) => (
@@ -96,15 +91,14 @@ export default function LocationPicker({ onSelect, initialLat, initialLng, label
                 <p className="text-xs text-slate-500 truncate">{item.display_name}</p>
               </button>
             ))}
-          </div>        )}
+          </div>
+        )}
       </div>
 
-      {/* MapLibre Map */}
       <Map
-        {...viewState}
-        style={{ width: '100%', height: '100%' }}
+        {...viewState}        style={{ width: '100%', height: '100%' }}
         mapStyle={MAP_STYLE}
-        mapLib={maplibregl}
+        mapLib={maplibregl as any} // ✅ Fixed Type Error
         onClick={handleMapClick}
       >
         {selectedLoc && (
