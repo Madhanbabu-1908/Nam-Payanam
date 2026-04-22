@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
-import type { Feature, LineString } from "geojson";
+import type { Feature, LineString, Position } from "geojson";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 type Trip = {
   id: string;
-  route?: LineString; // ✅ Strong GeoJSON typing
+  route?: LineString;
 };
 
 type Location = {
@@ -24,9 +24,13 @@ export default function PublicTrackPage() {
 
   const tripId = window.location.pathname.split("/").pop();
 
-  // ✅ Single ENV
   const API_URL = import.meta.env.VITE_API_URL;
   const WS_URL = API_URL.replace(/^http/, "ws");
+
+  // ✅ Helper: Convert Position → Tuple
+  const toLngLat = (pos: Position): [number, number] => {
+    return [pos[0], pos[1]];
+  };
 
   // 🚀 Fetch Trip
   useEffect(() => {
@@ -35,10 +39,10 @@ export default function PublicTrackPage() {
     fetch(`${API_URL}/trips/${tripId}`)
       .then(res => res.json())
       .then(data => setTrip(data.data))
-      .catch(err => console.error("Fetch trip failed:", err));
+      .catch(err => console.error(err));
   }, [tripId]);
 
-  // 🗺️ Initialize Map
+  // 🗺️ Init Map
   useEffect(() => {
     if (!mapContainer.current) return;
 
@@ -54,14 +58,13 @@ export default function PublicTrackPage() {
     return () => mapRef.current?.remove();
   }, []);
 
-  // 🚀 Draw Route + Auto Fit
+  // 🚀 Draw Route
   useEffect(() => {
     if (!trip?.route || !mapRef.current) return;
 
     const map = mapRef.current;
     const coords = trip.route.coordinates;
 
-    // ✅ Strongly typed GeoJSON Feature
     const routeFeature: Feature<LineString> = {
       type: "Feature",
       properties: {},
@@ -71,7 +74,7 @@ export default function PublicTrackPage() {
     if (!map.getSource("route")) {
       map.addSource("route", {
         type: "geojson",
-        data: routeFeature, // ✅ No TS error
+        data: routeFeature,
       });
 
       map.addLayer({
@@ -85,44 +88,37 @@ export default function PublicTrackPage() {
       });
     }
 
-    // ✅ Auto fit bounds
+    // ✅ FIXED: bounds typing
     const bounds = new maplibregl.LngLatBounds();
-    coords.forEach(c => bounds.extend(c));
+    coords.forEach(c => bounds.extend(toLngLat(c)));
     map.fitBounds(bounds, { padding: 50 });
 
-    // 📏 Distance calculation
+    // ✅ FIXED: distance typing
     let total = 0;
     for (let i = 1; i < coords.length; i++) {
-      total += getDistance(coords[i - 1], coords[i]);
+      total += getDistance(toLngLat(coords[i - 1]), toLngLat(coords[i]));
     }
-    setDistance(total);
 
-    // ⏱ ETA (avg 40km/h)
+    setDistance(total);
     setEta(total / 40);
 
   }, [trip]);
 
-  // 🚗 WebSocket tracking
+  // 🚗 WebSocket
   useEffect(() => {
     if (!mapRef.current || !tripId) return;
 
     const socket = new WebSocket(`${WS_URL}/track/${tripId}`);
-
-    socket.onopen = () => console.log("✅ WebSocket connected");
 
     socket.onmessage = (event) => {
       const loc: Location = JSON.parse(event.data);
       animateVehicle(loc);
     };
 
-    socket.onerror = (err) => console.error("❌ WS error:", err);
-
-    socket.onclose = () => console.log("🔌 WebSocket closed");
-
     return () => socket.close();
   }, [tripId]);
 
-  // 🚗 Smooth animation
+  // 🚗 Animate
   const animateVehicle = (target: Location) => {
     if (!mapRef.current) return;
 
@@ -145,8 +141,8 @@ export default function PublicTrackPage() {
     const animate = (time: number) => {
       const progress = Math.min((time - startTime) / duration, 1);
 
-      const lng = start.lng + (target.lng - target.lng) * 0 + (target.lng - start.lng) * progress;
-      const lat = start.lat + (target.lat - target.lat) * 0 + (target.lat - start.lat) * progress;
+      const lng = start.lng + (target.lng - start.lng) * progress;
+      const lat = start.lat + (target.lat - start.lat) * progress;
 
       vehicleMarker.current!.setLngLat([lng, lat]);
 
@@ -156,9 +152,10 @@ export default function PublicTrackPage() {
     requestAnimationFrame(animate);
   };
 
-  // 📏 Haversine
+  // 📏 Distance
   const getDistance = (a: [number, number], b: [number, number]) => {
     const R = 6371;
+
     const dLat = (b[1] - a[1]) * Math.PI / 180;
     const dLng = (b[0] - a[0]) * Math.PI / 180;
 
@@ -172,32 +169,14 @@ export default function PublicTrackPage() {
     return 2 * R * Math.atan2(Math.sqrt(val), Math.sqrt(1 - val));
   };
 
-  // 🔗 Share
-  const share = () => {
-    navigator.clipboard.writeText(window.location.href);
-    alert("Tracking link copied!");
-  };
-
   return (
     <div className="h-screen flex flex-col">
-
-      {/* 🔥 Info Bar */}
-      <div className="p-4 bg-white shadow flex justify-between items-center">
-        <div>
-          <h2 className="font-bold text-lg">Live Tracking</h2>
-          <p>Distance: {distance.toFixed(2)} km</p>
-          <p>ETA: {eta.toFixed(2)} hrs</p>
-        </div>
-
-        <button
-          onClick={share}
-          className="bg-blue-500 text-white px-4 py-2 rounded"
-        >
-          Share 🔗
-        </button>
+      <div className="p-4 bg-white shadow">
+        <h2 className="font-bold">Live Tracking</h2>
+        <p>Distance: {distance.toFixed(2)} km</p>
+        <p>ETA: {eta.toFixed(2)} hrs</p>
       </div>
 
-      {/* 🗺️ Map */}
       <div ref={mapContainer} className="flex-1" />
     </div>
   );
