@@ -143,8 +143,15 @@ body {
          text-xs font-bold transition-all duration-150 active:scale-95 cursor-pointer;
 }
 .cat-active   { @apply border-[var(--brand)] bg-orange-50 text-[var(--brand)]; }
-.cat-inactive { border-color: var(--border); @apply text-[var(--muted)] hover:border-[var(--brand)]/40; }
+.cat-inactive { 
+  border-color: var(--border); 
+  @apply text-[var(--muted)];
+}
 
+.cat-inactive:hover {
+  border-color: var(--brand);
+  opacity: 0.4;
+}
 /* ── Map ───────────────────────────────────────────────────── */
 .leaflet-container {
   width: 100%;
