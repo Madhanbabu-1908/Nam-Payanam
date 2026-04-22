@@ -3,6 +3,7 @@ import { AuthRequest } from '../middleware/authMiddleware';
 import { tripService } from '../services/tripService';
 import { aiService } from '../services/aiService';
 import { supabaseAdmin } from '../config/db';
+import { getRealRoute } from '../utils/routeUtils'; // ✅ Import the route helper
 
 export const tripController = {
   createTrip: async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -28,15 +29,32 @@ export const tripController = {
 
       const userId = req.user.id;
 
+      // ✅ 1. Calculate Real Driving Route if coordinates are provided
+      let routeCoords: [number, number][] = [];
+      
+      if (start_lat && start_lng && destination_lat && destination_lng) {
+        try {
+          routeCoords = await getRealRoute(
+            [parseFloat(start_lat), parseFloat(start_lng)], 
+            [parseFloat(destination_lat), parseFloat(destination_lng)]
+          );
+          console.log(`✅ Route calculated with ${routeCoords.length} points.`);
+        } catch (routeError) {
+          console.error("❌ Failed to calculate route, proceeding without it:", routeError);
+          // Continue without route if calculation fails
+        }
+      }
+
+      // ✅ 2. Create Trip with Route Data
       const newTrip = await tripService.createTrip({
-        organizer_id: userId,
-        name,
+        organizer_id: userId,        name,
         destination,
         start_location,
         destination_lat: destination_lat ? Number(destination_lat) : undefined,
         destination_lng: destination_lng ? Number(destination_lng) : undefined,
         start_lat: start_lat ? Number(start_lat) : undefined,
         start_lng: start_lng ? Number(start_lng) : undefined,
+        route_ routeCoords, // ✅ Save the route array to DB
         start_date,
         end_date,
         budget: Number(budget),
@@ -44,7 +62,7 @@ export const tripController = {
         status: 'PLANNING',
       });
 
-      // Add organizer
+      // 3. Add organizer to trip_members
       const { error: memberError } = await supabaseAdmin
         .from('trip_members')
         .insert({
@@ -54,11 +72,12 @@ export const tripController = {
         });
 
       if (memberError) {
+        // Rollback trip creation if member insert fails
         await supabaseAdmin.from('trips').delete().eq('id', newTrip.id);
         throw memberError;
       }
 
-      // AI Itinerary
+      // 4. AI Itinerary Generation (if mode is AI)
       if (mode === 'AI' && interests && start_location) {
         try {
           const days =
@@ -77,8 +96,7 @@ export const tripController = {
             startLocation: start_location
           });
 
-          const itemsToInsert = aiItems.map((item: any) => ({
-            ...item,
+          const itemsToInsert = aiItems.map((item: any) => ({            ...item,
             trip_id: newTrip.id
           }));
 
@@ -87,12 +105,14 @@ export const tripController = {
           }
         } catch (err: any) {
           console.error("AI generation failed:", err.message);
+          // Don't fail the whole request if AI fails
         }
       }
 
       res.status(201).json({ success: true, data: newTrip });
 
     } catch (error: any) {
+      console.error("❌ Error in createTrip:", error);
       next(error);
     }
   },
@@ -125,8 +145,7 @@ export const tripController = {
         return res.json({ success: true, data: [] });
       }
 
-      const { data: trips, error } = await supabaseAdmin
-        .from('trips')
+      const { data: trips, error } = await supabaseAdmin        .from('trips')
         .select('*')
         .in('id', allTripIds)
         .order('created_at', { ascending: false });
@@ -175,7 +194,6 @@ export const tripController = {
       if (!trip) {
         return res.status(404).json({ success: false, error: 'Trip not found' });
       }
-
       const { data: existing } = await supabaseAdmin
         .from('trip_members')
         .select('id')
@@ -225,8 +243,7 @@ export const tripController = {
         return res.status(403).json({ success: false, error: 'Unauthorized' });
       }
 
-      const { data: updatedTrip, error } = await supabaseAdmin
-        .from('trips')
+      const { data: updatedTrip, error } = await supabaseAdmin        .from('trips')
         .update(req.body)
         .eq('id', tripId)
         .select()
