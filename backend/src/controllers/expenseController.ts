@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { supabase } from '../config/supabase';
+import { supabaseAdmin } from '../config/db';
 
 // ── Settlement calculation (min transactions) ────────────────
 function minimizeCashFlow(balances: Record<string, number>) {
