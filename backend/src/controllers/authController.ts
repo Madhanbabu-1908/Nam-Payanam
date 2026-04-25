@@ -1,6 +1,5 @@
 import { Request, Response } from 'express';
-import { supabase } from '../config/db';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '../config/db';
 
 const supabaseAdmin = createClient(
   process.env.SUPABASE_URL!,
