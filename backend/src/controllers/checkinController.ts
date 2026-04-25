@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { supabase } from '../config/supabase';
+import { supabase } from '../config/db';
 
 // POST /api/checkins
 export const checkIn = async (req: Request, res: Response) => {
