@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { supabase } from '../config/supabase';
+import { supabase } from '../config/db';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseAdmin = createClient(
