@@ -1,11 +1,7 @@
 import { Request, Response } from 'express';
+import { AuthRequest } from '../middleware/authMiddleware';
+import { aiService } from '../services/aiService';
 import { supabaseAdmin } from '../config/db';
-
-const supabaseAdmin = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!, // service role key needed to delete auth users
-  { auth: { autoRefreshToken: false, persistSession: false } }
-);
 
 // DELETE /api/auth/account  — permanently delete user + all their data
 export const deleteAccount = async (req: Request, res: Response) => {
