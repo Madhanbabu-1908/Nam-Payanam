@@ -1,16 +1,17 @@
 import { Request, Response } from 'express';
-import { supabaseAdmin } from '../config/db';
+import { supabase } from '../config/supabase';
 import { generateItinerary } from '../services/itineraryAiService';
 
-// GET /api/itinerary/trips/:tripId
+// GET /api/itinerary/trip/:tripId
 export const getItinerary = async (req: Request, res: Response) => {
   try {
     const { tripId } = req.params;
     const { data, error } = await supabase
-      .from('itinerary_stops')
+      .from('itinerary_items')
       .select('*')
       .eq('trip_id', tripId)
-      .order('day_number').order('time_of_day');
+      .order('day_number')
+      .order('time_slot');
     if (error) throw error;
     res.json({ success: true, data });
   } catch (err: any) {
@@ -18,21 +19,24 @@ export const getItinerary = async (req: Request, res: Response) => {
   }
 };
 
-// POST /api/itinerary/trips/:tripId  — add single stop
+// POST /api/itinerary/:tripId — add single stop
 export const addStop = async (req: Request, res: Response) => {
   try {
     const { tripId } = req.params;
-    const userId = (req as any).user?.id;
+    const userId     = (req as any).user?.id;
     const { data: trip } = await supabase.from('trips').select('organizer_id').eq('id', tripId).single();
-    if (!trip || trip.organizer_id !== userId) return res.status(403).json({ success: false, error: 'Only organiser can edit itinerary' });
-
-    const { name, stop_type, day_number, time_of_day, duration_minutes, cost_estimate, notes, latitude, longitude } = req.body;
-    const { data, error } = await supabase.from('itinerary_stops').insert({
-      trip_id: tripId, name, stop_type: stop_type || 'STOP',
-      day_number: day_number || 1, time_of_day: time_of_day || '09:00',
-      duration_minutes: duration_minutes || 60,
-      cost_estimate: parseFloat(cost_estimate) || 0,
-      notes: notes || null, latitude: latitude || null, longitude: longitude || null,
+    if (!trip || trip.organizer_id !== userId) {
+      return res.status(403).json({ success: false, error: 'Only the organiser can edit the itinerary' });
+    }
+    const { day_number, time_slot, location_name, description, estimated_cost, category } = req.body;
+    const { data, error } = await supabase.from('itinerary_items').insert({
+      trip_id:        tripId,
+      day_number:     parseInt(day_number) || 1,
+      time_slot:      time_slot      || 'Morning',
+      location_name:  location_name?.trim(),
+      description:    description?.trim() || null,
+      estimated_cost: parseFloat(estimated_cost) || 0,
+      category:       category || 'SIGHTSEEING',
     }).select().single();
     if (error) throw error;
     res.json({ success: true, data });
@@ -41,25 +45,27 @@ export const addStop = async (req: Request, res: Response) => {
   }
 };
 
-// PUT /api/itinerary/:stopId
+// PUT /api/itinerary/:itemId
 export const updateStop = async (req: Request, res: Response) => {
   try {
-    const { stopId } = req.params;
-    const userId = (req as any).user?.id;
-    // Verify organiser via join
-    const { data: stop } = await supabase.from('itinerary_stops').select('trip_id').eq('id', stopId).single();
-    if (!stop) return res.status(404).json({ success: false, error: 'Stop not found' });
-    const { data: trip } = await supabase.from('trips').select('organizer_id').eq('id', stop.trip_id).single();
-    if (!trip || trip.organizer_id !== userId) return res.status(403).json({ success: false, error: 'Forbidden' });
-
-    const { name, stop_type, day_number, time_of_day, duration_minutes, cost_estimate, notes, latitude, longitude } = req.body;
-    const { data, error } = await supabase.from('itinerary_stops').update({
-      name, stop_type, day_number, time_of_day,
-      duration_minutes: duration_minutes || 60,
-      cost_estimate: parseFloat(cost_estimate) || 0,
-      notes: notes || null, latitude: latitude || null, longitude: longitude || null,
-      updated_at: new Date().toISOString(),
-    }).eq('id', stopId).select().single();
+    const { itemId } = req.params;
+    const userId     = (req as any).user?.id;
+    const { data: item } = await supabase.from('itinerary_items').select('trip_id').eq('id', itemId).single();
+    if (!item) return res.status(404).json({ success: false, error: 'Stop not found' });
+    const { data: trip } = await supabase.from('trips').select('organizer_id').eq('id', item.trip_id).single();
+    if (!trip || trip.organizer_id !== userId) {
+      return res.status(403).json({ success: false, error: 'Only the organiser can edit the itinerary' });
+    }
+    const { day_number, time_slot, location_name, description, estimated_cost, category } = req.body;
+    const { data, error } = await supabase.from('itinerary_items').update({
+      day_number:     parseInt(day_number) || 1,
+      time_slot:      time_slot || 'Morning',
+      location_name:  location_name?.trim(),
+      description:    description?.trim() || null,
+      estimated_cost: parseFloat(estimated_cost) || 0,
+      category:       category || 'SIGHTSEEING',
+      updated_at:     new Date().toISOString(),
+    }).eq('id', itemId).select().single();
     if (error) throw error;
     res.json({ success: true, data });
   } catch (err: any) {
@@ -67,17 +73,18 @@ export const updateStop = async (req: Request, res: Response) => {
   }
 };
 
-// DELETE /api/itinerary/:stopId
+// DELETE /api/itinerary/:itemId
 export const deleteStop = async (req: Request, res: Response) => {
   try {
-    const { stopId } = req.params;
-    const userId = (req as any).user?.id;
-    const { data: stop } = await supabase.from('itinerary_stops').select('trip_id').eq('id', stopId).single();
-    if (!stop) return res.status(404).json({ success: false, error: 'Stop not found' });
-    const { data: trip } = await supabase.from('trips').select('organizer_id').eq('id', stop.trip_id).single();
-    if (!trip || trip.organizer_id !== userId) return res.status(403).json({ success: false, error: 'Forbidden' });
-
-    const { error } = await supabase.from('itinerary_stops').delete().eq('id', stopId);
+    const { itemId } = req.params;
+    const userId     = (req as any).user?.id;
+    const { data: item } = await supabase.from('itinerary_items').select('trip_id').eq('id', itemId).single();
+    if (!item) return res.status(404).json({ success: false, error: 'Stop not found' });
+    const { data: trip } = await supabase.from('trips').select('organizer_id').eq('id', item.trip_id).single();
+    if (!trip || trip.organizer_id !== userId) {
+      return res.status(403).json({ success: false, error: 'Only the organiser can delete itinerary stops' });
+    }
+    const { error } = await supabase.from('itinerary_items').delete().eq('id', itemId);
     if (error) throw error;
     res.json({ success: true });
   } catch (err: any) {
@@ -85,39 +92,38 @@ export const deleteStop = async (req: Request, res: Response) => {
   }
 };
 
-// POST /api/itinerary/trips/:tripId/generate-ai
-export const generateAI = async (req: Request, res: Response) => {
+// POST /api/ai/trips/:tripId/regenerate — generate full AI plan
+export const regenerateAI = async (req: Request, res: Response) => {
   try {
     const { tripId } = req.params;
-    const userId = (req as any).user?.id;
+    const userId     = (req as any).user?.id;
     const { data: trip } = await supabase.from('trips').select('*').eq('id', tripId).single();
     if (!trip) return res.status(404).json({ success: false, error: 'Trip not found' });
-    if (trip.organizer_id !== userId) return res.status(403).json({ success: false, error: 'Only organiser can generate itinerary' });
+    if (trip.organizer_id !== userId) {
+      return res.status(403).json({ success: false, error: 'Only the organiser can generate the itinerary' });
+    }
 
-    const { startLocation, destination, stops, startDate, endDate, budget, interests } = req.body;
-
-    // Generate via AI
-    const aiStops = await generateItinerary({
-      startLocation: startLocation || trip.start_location,
-      destination:   destination   || trip.destination,
-      stops:         stops         || trip.stops || [],
-      startDate:     startDate     || trip.start_date,
-      endDate:       endDate       || trip.end_date,
-      budget:        budget        || trip.budget,
-      interests:     interests     || trip.interests || [],
+    const stops = await generateItinerary({
+      startLocation: trip.start_location,
+      destination:   trip.destination,
+      stops:         trip.stops || [],
+      startDate:     trip.start_date,
+      endDate:       trip.end_date,
+      budget:        trip.budget,
+      interests:     trip.interests || [],
     });
 
-    // Delete existing stops
-    await supabase.from('itinerary_stops').delete().eq('trip_id', tripId);
-
-    // Insert all new stops
-    const rows = aiStops.map(s => ({ ...s, trip_id: tripId }));
-    const { data, error } = await supabase.from('itinerary_stops').insert(rows).select();
+    // Replace existing itinerary
+    await supabase.from('itinerary_items').delete().eq('trip_id', tripId);
+    const { data, error } = await supabase
+      .from('itinerary_items')
+      .insert(stops.map(s => ({ ...s, trip_id: tripId })))
+      .select();
     if (error) throw error;
 
     res.json({ success: true, data, count: data?.length });
   } catch (err: any) {
-    console.error('AI itinerary error:', err);
+    console.error('AI regenerate error:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 };
