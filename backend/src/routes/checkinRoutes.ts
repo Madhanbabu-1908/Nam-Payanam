@@ -7,5 +7,6 @@ router.use(authMiddleware);
 
 router.post('/', checkinController.createCheckin);
 router.get('/trip/:tripId', checkinController.getCheckins);
+router.patch('/:checkinId/status', checkinController.updateStatus);
 
 export default router;

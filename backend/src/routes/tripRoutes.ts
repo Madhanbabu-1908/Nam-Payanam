@@ -19,6 +19,10 @@ router.post('/', tripController.createTrip);
 
 // Join trip (Any authenticated user)
 router.post('/:tripId/join', tripController.joinTrip);
+// Join by code
+router.post('/join-by-code', tripController.joinByCode);
+// Get members with profiles
+router.get('/:tripId/members', tripController.getMembers);
 
 // Update/Delete (Organizer only)
 router.put('/:tripId', requireOrganizer, tripController.updateTrip);
