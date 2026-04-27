@@ -1,118 +1,131 @@
 import { Request, Response } from "express";
 import { aiService } from "../services/aiService";
 
-// 🔥 1. Generate Trip Plan
-export const generateTripPlan = async (req: Request, res: Response) => {
-  try {
-    const { destination, days, budget, interests, startLocation } = req.body;
+// 🔥 Controller as OBJECT (IMPORTANT for your routes)
+export const aiController = {
 
-    // ✅ Convert object → string prompt
-    const prompt = `
-Plan a trip:
+  // ✅ 1. Regenerate itinerary
+  regenerateItinerary: async (req: Request, res: Response) => {
+    try {
+      const { tripId } = req.params;
 
-Destination: ${destination}
-Days: ${days}
-Budget: ${budget}
-Interests: ${interests}
-Start Location: ${startLocation}
-`;
+      // In real app → fetch trip details from DB using tripId
+      const prompt = `Regenerate itinerary for trip ID: ${tripId}`;
 
-    const result = await aiService.generateItinerary(prompt);
+      const result = await aiService.generateItinerary(prompt);
 
-    return res.json({
-      success: true,
-      data: result,
-    });
-  } catch (err: any) {
-    console.error("AI Trip Error:", err.message);
+      return res.json({
+        success: true,
+        data: result,
+      });
+    } catch (err: any) {
+      console.error("AI regenerate error:", err.message);
 
-    return res.status(500).json({
-      success: false,
-      message: "Failed to generate trip plan",
-    });
-  }
-};
-
-// 🔥 2. Chat with AI
-export const chatWithAI = async (req: Request, res: Response) => {
-  try {
-    const { message } = req.body;
-
-    if (!message) {
-      return res.status(400).json({
+      return res.status(500).json({
         success: false,
-        message: "Message is required",
+        message: "Failed to regenerate itinerary",
       });
     }
+  },
 
-    const reply = await aiService.chat(message);
+  // ✅ 2. Chat
+  chat: async (req: Request, res: Response) => {
+    try {
+      const { message } = req.body;
+      const { tripId } = req.params;
 
-    return res.json({
-      success: true,
-      data: reply,
-    });
-  } catch (err: any) {
-    console.error("AI Chat Error:", err.message);
+      if (!message) {
+        return res.status(400).json({
+          success: false,
+          message: "Message is required",
+        });
+      }
 
-    return res.status(500).json({
-      success: false,
-      message: "Chat failed",
-    });
-  }
-};
+      const reply = await aiService.chat(
+        `Trip ${tripId}: ${message}`
+      );
 
-// 🔥 3. Budget Analysis
-export const analyzeBudget = async (req: Request, res: Response) => {
-  try {
-    const { budgetDetails } = req.body;
+      return res.json({
+        success: true,
+        data: reply,
+      });
+    } catch (err: any) {
+      console.error("AI chat error:", err.message);
 
-    if (!budgetDetails) {
-      return res.status(400).json({
+      return res.status(500).json({
         success: false,
-        message: "Budget details required",
+        message: "Chat failed",
       });
     }
+  },
 
-    const result = await aiService.analyzeBudget(budgetDetails);
+  // ✅ 3. Chat history (mock for now)
+  getChatHistory: async (req: Request, res: Response) => {
+    try {
+      const { tripId } = req.params;
 
-    return res.json({
-      success: true,
-      data: result,
-    });
-  } catch (err: any) {
-    console.error("Budget Error:", err.message);
+      // 🔥 Replace with DB later
+      return res.json({
+        success: true,
+        data: [
+          { role: "user", message: "Plan my day" },
+          { role: "ai", message: "Here is your plan..." },
+        ],
+      });
+    } catch (err: any) {
+      console.error("Chat history error:", err.message);
 
-    return res.status(500).json({
-      success: false,
-      message: "Budget analysis failed",
-    });
-  }
-};
-
-// 🔥 4. Trip Summary
-export const generateSummary = async (req: Request, res: Response) => {
-  try {
-    const { tripData } = req.body;
-
-    if (!tripData) {
-      return res.status(400).json({
+      return res.status(500).json({
         success: false,
-        message: "Trip data required",
+        message: "Failed to fetch chat history",
       });
     }
+  },
 
-    const result = await aiService.generateSummary(tripData);
+  // ✅ 4. Budget analysis
+  analyzeBudget: async (req: Request, res: Response) => {
+    try {
+      const { tripId } = req.params;
 
-    return res.json({
-      success: true,
-      data: result,
-    });
-  } catch (err: any) {
-    console.error("Summary Error:", err.message);
+      // In real app → fetch trip expenses
+      const input = `Analyze budget for trip ID: ${tripId}`;
 
-    return res.status(500).json({
-      success: false,
-      message: "Summary generation failed",
-    });
-  }
+      const result = await aiService.analyzeBudget(input);
+
+      return res.json({
+        success: true,
+        data: result,
+      });
+    } catch (err: any) {
+      console.error("Budget error:", err.message);
+
+      return res.status(500).json({
+        success: false,
+        message: "Budget analysis failed",
+      });
+    }
+  },
+
+  // ✅ 5. Trip summary
+  generateSummary: async (req: Request, res: Response) => {
+    try {
+      const { tripId } = req.params;
+
+      const input = `Summarize trip ID: ${tripId}`;
+
+      const result = await aiService.generateSummary(input);
+
+      return res.json({
+        success: true,
+        data: result,
+      });
+    } catch (err: any) {
+      console.error("Summary error:", err.message);
+
+      return res.status(500).json({
+        success: false,
+        message: "Summary failed",
+      });
+    }
+  },
 };
