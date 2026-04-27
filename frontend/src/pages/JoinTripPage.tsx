@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { api } from "../config/api"; ✅
+import { api } from '../config/api'; ✅
 import { motion } from "framer-motion";
 
 export default function JoinTripPage() {
