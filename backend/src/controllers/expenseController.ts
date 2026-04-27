@@ -1,200 +1,152 @@
-import { Request, Response } from 'express';
-import { supabase } from '../config/supabase';
+import { Response, NextFunction } from 'express';
+import { AuthRequest } from '../middleware/authMiddleware';
+import { supabaseAdmin } from '../config/db';
 
-// ── Min-transaction settlement algorithm ─────────────────────
-function minimizeCashFlow(balances: Record<string, number>) {
-  const creditors: { id: string; amt: number }[] = [];
-  const debtors:   { id: string; amt: number }[] = [];
+export const expenseController = {
+  // Add expense with equal OR manual split
+  addExpense: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { tripId } = req.params;
+      const { amount, description, category, date, split_type = 'EQUAL', notes, manual_splits } = req.body;
+      const userId = req.user!.id;
 
-  Object.entries(balances).forEach(([id, b]) => {
-    const r = Math.round(b * 100) / 100;
-    if (r >  0.01) creditors.push({ id, amt: r });
-    if (r < -0.01) debtors.push({ id, amt: Math.abs(r) });
-  });
+      const { data: member } = await supabaseAdmin.from('trip_members')
+        .select('id').eq('trip_id', tripId).eq('user_id', userId).single();
+      if (!member) return res.status(403).json({ success: false, error: 'Not a trip member' });
 
-  creditors.sort((a, b) => b.amt - a.amt);
-  debtors.sort(  (a, b) => b.amt - a.amt);
+      const { data: members } = await supabaseAdmin.from('trip_members')
+        .select('user_id').eq('trip_id', tripId);
+      if (!members?.length) throw new Error('No members found');
 
-  const txs: { from: string; to: string; amount: number }[] = [];
-  let i = 0, j = 0;
-  while (i < creditors.length && j < debtors.length) {
-    const amt = Math.min(creditors[i].amt, debtors[j].amt);
-    txs.push({ from: debtors[j].id, to: creditors[i].id, amount: Math.round(amt * 100) / 100 });
-    creditors[i].amt -= amt;
-    debtors[j].amt   -= amt;
-    if (creditors[i].amt < 0.01) i++;
-    if (debtors[j].amt   < 0.01) j++;
-  }
-  return txs;
-}
+      const { data: expense, error: expErr } = await supabaseAdmin.from('expenses').insert({
+        trip_id: tripId, amount: Number(amount), description,
+        category: category || 'OTHER', paid_by_user_id: userId,
+        date: date || new Date().toISOString(),
+        split_type, notes: notes || null
+      }).select().single();
+      if (expErr) throw expErr;
 
-// POST /api/expenses/:tripId — add expense with equal or manual split
-export const addExpense = async (req: Request, res: Response) => {
-  try {
-    const { tripId }   = req.params;
-    const userId       = (req as any).user?.id;
-    const { amount, description, category, date, splitMode, customSplits } = req.body;
-
-    // 1. Insert expense row
-    const { data: exp, error: eErr } = await supabase
-      .from('expenses')
-      .insert({
-        trip_id:         tripId,
-        paid_by_user_id: userId,
-        amount:          parseFloat(amount),
-        description:     description?.trim(),
-        category:        category || 'OTHER',
-        date:            date || new Date().toISOString(),
-        split_mode:      splitMode || 'equal',
-      })
-      .select()
-      .single();
-    if (eErr) throw eErr;
-
-    // 2. Build splits
-    let splitRows: { trip_id: string; expense_id: string; user_id: string; amount_owed: number }[] = [];
-
-    if (splitMode === 'manual' && Array.isArray(customSplits) && customSplits.length > 0) {
-      splitRows = customSplits.map((s: any) => ({
-        trip_id:     tripId,
-        expense_id:  exp.id,
-        user_id:     s.user_id,
-        amount_owed: parseFloat(s.amount) || 0,
-      }));
-    } else {
-      // Equal split among all trip members
-      const { data: members } = await supabase
-        .from('trip_members').select('user_id').eq('trip_id', tripId);
-      const count = members?.length || 1;
-      const pp    = parseFloat(amount) / count;
-      splitRows   = (members || []).map(m => ({
-        trip_id:     tripId,
-        expense_id:  exp.id,
-        user_id:     m.user_id,
-        amount_owed: Math.round(pp * 100) / 100,
-      }));
-    }
-
-    if (splitRows.length > 0) {
-      const { error: sErr } = await supabase.from('expense_splits').insert(splitRows);
-      if (sErr) throw sErr;
-    }
-
-    res.json({ success: true, data: exp });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-};
-
-// GET /api/expenses/:tripId
-export const getExpenses = async (req: Request, res: Response) => {
-  try {
-    const { tripId } = req.params;
-    const { data, error } = await supabase
-      .from('expenses')
-      .select('*, expense_splits(*)')
-      .eq('trip_id', tripId)
-      .order('date', { ascending: false });
-    if (error) throw error;
-    res.json({ success: true, data });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-};
-
-// GET /api/expenses/:tripId/settlements
-export const getSettlements = async (req: Request, res: Response) => {
-  try {
-    const { tripId } = req.params;
-
-    const [{ data: expenses }, { data: members }] = await Promise.all([
-      supabase.from('expenses').select('*, expense_splits(*)').eq('trip_id', tripId),
-      supabase.from('trip_members').select('user_id').eq('trip_id', tripId),
-    ]);
-
-    // Build net balance per user
-    const balances: Record<string, number> = {};
-    (members || []).forEach(m => { balances[m.user_id] = 0; });
-
-    (expenses || []).forEach(exp => {
-      // Payer gets credited the full amount
-      balances[exp.paid_by_user_id] = (balances[exp.paid_by_user_id] || 0) + exp.amount;
-      // Each split person is debited their unsettled share
-      (exp.expense_splits || []).forEach((split: any) => {
-        if (!split.is_settled) {
-          const share = parseFloat(split.amount_owed) || 0;
-          balances[split.user_id] = (balances[split.user_id] || 0) - share;
-        }
-      });
-    });
-
-    const transactions = minimizeCashFlow(balances);
-    res.json({ success: true, data: { transactions, balances } });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-};
-
-// POST /api/expenses/:tripId/settle — record that a payment was made
-export const recordSettlement = async (req: Request, res: Response) => {
-  try {
-    const { tripId }  = req.params;
-    const userId      = (req as any).user?.id;
-    const { fromUserId, toUserId, amount } = req.body;
-
-    // Only the payer or the receiver can mark a settlement
-    if (userId !== fromUserId && userId !== toUserId) {
-      return res.status(403).json({ success: false, error: 'Only the payer or receiver can record this payment' });
-    }
-
-    // Mark splits as settled in order: oldest first
-    // Find expenses paid BY toUserId where fromUserId has unsettled splits
-    const { data: expenses } = await supabase
-      .from('expenses')
-      .select('id, paid_by_user_id, expense_splits(*)')
-      .eq('trip_id', tripId)
-      .eq('paid_by_user_id', toUserId);
-
-    let remaining = parseFloat(amount);
-
-    for (const exp of expenses || []) {
-      for (const split of (exp.expense_splits || []) as any[]) {
-        if (split.user_id === fromUserId && !split.is_settled && remaining > 0.01) {
-          const owed    = parseFloat(split.amount_owed);
-          const settling = Math.min(remaining, owed);
-          remaining -= settling;
-
-          if (owed - settling < 0.01) {
-            // Fully settled
-            await supabase.from('expense_splits').update({
-              is_settled:  true,
-              settled_at:  new Date().toISOString(),
-              settled_by:  userId,
-              amount_owed: 0,
-            }).eq('id', split.id);
-          } else {
-            // Partially settled — reduce amount
-            await supabase.from('expense_splits').update({
-              amount_owed: Math.round((owed - settling) * 100) / 100,
-            }).eq('id', split.id);
-          }
-        }
+      // Build splits
+      let splits;
+      if (split_type === 'EQUAL') {
+        const share = Number(amount) / members.length;
+        splits = members.map((m: any) => ({
+          expense_id: expense.id, user_id: m.user_id,
+          amount_owed: Math.round(share * 100) / 100,
+          is_settled: m.user_id === userId,
+        }));
+      } else {
+        // Manual: manual_splits = [{user_id, amount_owed}]
+        if (!manual_splits?.length) throw new Error('Manual splits required');
+        splits = manual_splits.map((s: any) => ({
+          expense_id: expense.id, user_id: s.user_id,
+          amount_owed: Number(s.amount_owed),
+          is_settled: s.user_id === userId,
+        }));
       }
-      if (remaining <= 0.01) break;
-    }
 
-    // Log the settlement transaction for audit
-    await supabase.from('settlement_transactions').insert({
-      trip_id:      tripId,
-      from_user_id: fromUserId,
-      to_user_id:   toUserId,
-      amount:       parseFloat(amount),
-      recorded_by:  userId,
-      settled_at:   new Date().toISOString(),
-    });
+      const { error: splitErr } = await supabaseAdmin.from('expense_splits').insert(splits);
+      if (splitErr) throw splitErr;
 
-    res.json({ success: true, message: 'Payment recorded successfully' });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
-  }
+      res.status(201).json({ success: true, data: expense });
+    } catch (err: any) { next(err); }
+  },
+
+  getExpenses: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { tripId } = req.params;
+      const { data, error } = await supabaseAdmin.from('expenses')
+        .select('*, expense_splits(*), paid_by:paid_by_user_id (email)')
+        .eq('trip_id', tripId).order('date', { ascending: false });
+      if (error) throw error;
+      res.json({ success: true, data });
+    } catch (err: any) { next(err); }
+  },
+
+  deleteExpense: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { expenseId } = req.params;
+      const { error } = await supabaseAdmin.from('expenses').delete().eq('id', expenseId);
+      if (error) throw error;
+      res.json({ success: true });
+    } catch (err: any) { next(err); }
+  },
+
+  // Mark a split as settled (owed person confirms payment received)
+  settleSplit: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { splitId } = req.params;
+      const { settled_amount } = req.body;
+      const userId = req.user!.id;
+
+      // Get split + expense to verify the owed person is settling
+      const { data: split } = await supabaseAdmin.from('expense_splits')
+        .select('*, expense:expense_id(paid_by_user_id, amount)').eq('id', splitId).single();
+      if (!split) return res.status(404).json({ success: false, error: 'Split not found' });
+
+      const { error } = await supabaseAdmin.from('expense_splits').update({
+        is_settled: true,
+        settled_amount: settled_amount || split.amount_owed,
+        settled_at: new Date().toISOString()
+      }).eq('id', splitId);
+      if (error) throw error;
+
+      res.json({ success: true });
+    } catch (err: any) { next(err); }
+  },
+
+  // Settlements calculation using real split data
+  getSettlements: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { tripId } = req.params;
+
+      const [{ data: expenses }, { data: members }, { data: profiles }] = await Promise.all([
+        supabaseAdmin.from('expenses').select('*, expense_splits(*)').eq('trip_id', tripId),
+        supabaseAdmin.from('trip_members').select('user_id, role').eq('trip_id', tripId),
+        supabaseAdmin.from('profiles').select('id, full_name').in(
+          'id', (await supabaseAdmin.from('trip_members').select('user_id').eq('trip_id', tripId)).data?.map((m:any)=>m.user_id)||[]
+        ),
+      ]);
+
+      const nameMap: Record<string, string> = {};
+      profiles?.forEach((p: any) => { nameMap[p.id] = p.full_name || p.id.substring(0,8)+'…'; });
+
+      // Calculate net balances
+      const balances: Record<string, number> = {};
+      members?.forEach((m: any) => { balances[m.user_id] = 0; });
+
+      expenses?.forEach((exp: any) => {
+        const payerId = exp.paid_by_user_id;
+        if (!balances[payerId]) balances[payerId] = 0;
+        // Payer gets credit for what others owe (unsettled splits of others)
+        exp.expense_splits?.forEach((split: any) => {
+          if (split.user_id !== payerId && !split.is_settled) {
+            balances[payerId] = (balances[payerId] || 0) + split.amount_owed;
+            balances[split.user_id] = (balances[split.user_id] || 0) - split.amount_owed;
+          }
+        });
+      });
+
+      // Minimise transactions
+      const creditors = Object.entries(balances).filter(([,v]) => v > 0.01).sort(([,a],[,b]) => b-a);
+      const debtors   = Object.entries(balances).filter(([,v]) => v < -0.01).sort(([,a],[,b]) => a-b);
+      const transactions: any[] = [];
+      const cr = creditors.map(([n,v]) => ({ id:n, name: nameMap[n]||n.substring(0,8), bal:v }));
+      const db = debtors.map(([n,v])   => ({ id:n, name: nameMap[n]||n.substring(0,8), bal:-v }));
+      let i=0, j=0;
+      while (i<cr.length && j<db.length) {
+        const amt = Math.min(cr[i].bal, db[j].bal);
+        if (amt > 0.01) transactions.push({
+          from: db[j].id, fromName: db[j].name,
+          to: cr[i].id, toName: cr[i].name,
+          amount: Math.round(amt * 100) / 100
+        });
+        cr[i].bal -= amt; db[j].bal -= amt;
+        if (cr[i].bal < 0.01) i++;
+        if (db[j].bal < 0.01) j++;
+      }
+
+      res.json({ success: true, data: { transactions, balances, nameMap } });
+    } catch (err: any) { next(err); }
+  },
 };

@@ -45,7 +45,10 @@ export const tripController = {
         }
       }
 
-      // ✅ 2. Create Trip with Route Data
+      // ✅ 2. Generate trip code
+      const tripCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+      // ✅ 3. Create Trip with Route Data
       const newTrip = await tripService.createTrip({
         organizer_id: userId,        name,
         destination,
@@ -65,6 +68,7 @@ export const tripController = {
         budget: Number(budget),
         mode,
         status: 'PLANNING',
+        trip_code: tripCode,
       });
 
       // 3. Add organizer to trip_members
@@ -185,6 +189,41 @@ export const tripController = {
     }
   },
 
+
+  // Join trip by 6-char trip code
+  joinByCode: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { code } = req.body;
+      const userId = req.user!.id;
+      if (!code) return res.status(400).json({ success: false, error: 'Trip code required' });
+
+      const { data: trip, error } = await supabaseAdmin.from('trips')
+        .select('id, name, status, organizer_id').eq('trip_code', code.toUpperCase()).single();
+      if (error || !trip) return res.status(404).json({ success: false, error: 'Trip not found. Check the code.' });
+
+      // Already a member?
+      const { data: existing } = await supabaseAdmin.from('trip_members')
+        .select('id').eq('trip_id', trip.id).eq('user_id', userId).single();
+      if (existing) return res.status(400).json({ success: false, error: 'Already in this trip' });
+
+      const { error: memErr } = await supabaseAdmin.from('trip_members')
+        .insert({ trip_id: trip.id, user_id: userId, role: 'PARTICIPANT' });
+      if (memErr) throw memErr;
+
+      res.json({ success: true, data: trip });
+    } catch (err: any) { next(err); }
+  },
+
+  // Get members with profiles
+  getMembers: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { tripId } = req.params;
+      const { data, error } = await supabaseAdmin.from('trip_members')
+        .select('*, profile:user_id(full_name, email)').eq('trip_id', tripId);
+      if (error) throw error;
+      res.json({ success: true, data: data || [] });
+    } catch (err: any) { next(err); }
+  },
   joinTrip: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { tripId } = req.params;
