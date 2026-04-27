@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import api from "../config/api";
+import { api } from "../config/api";
 import { motion } from "framer-motion";
 
 type Member = {
