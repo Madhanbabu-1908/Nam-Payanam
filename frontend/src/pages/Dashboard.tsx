@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../config/api';
-import { ArrowLeft, Map, DollarSign, Users, CalendarDays, PieChart, Navigation, Sparkles, Trash2, Play, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Map, DollarSign, Users, CalendarDays, PieChart, Navigation, Sparkles, Trash2, Play, CheckCircle,MapPin } from 'lucide-react';
 import { Trip } from '../types';
 import { useAuth } from '../context/AuthContext';
 
