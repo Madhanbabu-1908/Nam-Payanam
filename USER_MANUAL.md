@@ -1,347 +1,250 @@
-# Nam Payanam — User Manual
-### நம் பயணம் · Your Complete Trip Planning Companion
+# 🗺️ Nam Payanam — User Manual
+### *நம் பயணம் · Your Smart Travel Companion*
 
 ---
 
-## Table of Contents
-1. Getting Started
-2. Creating an Account
-3. Creating a Trip (AI & Manual)
-4. Inviting Members & Joining a Trip
-5. Itinerary — AI Plan & Manual Editing
-6. Live Map & GPS Tracking
-7. Check-In Feature
-8. Expenses & Splitting Bills
-9. Settlements — Who Pays Whom
-10. Profile & Account Settings
-11. Quick Reference (FAQ)
+## 📖 Table of Contents
+1. [Getting Started](#getting-started)
+2. [Planning a Trip](#planning-a-trip)
+3. [Joining a Trip](#joining-a-trip)
+4. [Trip Dashboard](#trip-dashboard)
+5. [Itinerary](#itinerary)
+6. [Expenses & Settlements](#expenses--settlements)
+7. [Live Map & Tracking](#live-map--tracking)
+8. [Check-In Feature](#check-in-feature)
+9. [AI Assistant](#ai-assistant)
+10. [Members & Sharing](#members--sharing)
+11. [Profile & Settings](#profile--settings)
 
 ---
 
 ## 1. Getting Started
 
-**What is Nam Payanam?**
-Nam Payanam (நம் பயணம்) is a group trip planning app designed for Indian travellers. It handles everything from AI-generated itineraries and real road routing, to live GPS tracking, expense splitting, and check-ins.
+### Create an Account
+1. Open Nam Payanam → tap **Create Account**
+2. Enter your email and a password (min 6 characters)
+3. You're in! No verification needed.
 
-**Who is it for?**
-- Trip organisers who want to plan a group road trip
-- Members who want to join, track, and split costs together
-
-**What you need:**
-- A smartphone with a web browser (Chrome recommended)
-- An email address to create an account
+### Sign In
+1. Tap **Sign In** → enter your email + password
+2. Your trips load automatically
 
 ---
 
-## 2. Creating an Account
+## 2. Planning a Trip
 
-1. Open the app → tap **Sign Up**
-2. Enter your name, email and password
-3. Confirm your email (check inbox for verification link)
-4. Log in and you're ready
+### Step 1 — Route
+1. Tap **Plan a Trip** from Home
+2. Type your **Starting Point** → pick from the dropdown (powered by real maps)
+3. Optionally add **Middle Stops** (tap + to add more)
+4. Enter your **Destination**
+5. The map shows your **actual driving route** in blue automatically
 
-> **Tip:** Your name shows on the members list and in settlements — use your real first name so friends recognise you.
-
----
-
-## 3. Creating a Trip
-
-### Step 1 — Choose AI or Manual Mode
-
-At the top of the Create Trip screen you'll see two buttons:
-
-| Mode | When to use |
-|---|---|
-| **AI Plan** | You want smart suggestions, attractions, hotels and timings automatically generated |
-| **Manual** | You already know exactly where you're going |
-
----
-
-### Step 2 — Set Your Route (Both Modes)
-
-You will see a **map with a route planner sidebar** (like Google Maps):
-
-1. **Start Location** — Type your departure city/town and select from the dropdown
-2. **Add Stop** — Tap **+ Add stop** to insert any middle stop (waterfall, temple, friend's house)
-3. **End Destination** — Type your final destination
-
-**How the map works:**
-- As you pick each location the app automatically places a labelled pin (A, B, C…) on the map
-- Green pin = Start · Blue pins = Stops · Red pin = End
-- A **blue route line** appears showing the real road path (powered by OSRM)
-- Distance and driving time are shown at the top of the map card
-- You can add as many stops as you need — tap + Add stop repeatedly
-- To remove a stop tap the **×** next to it
-
----
-
-### Step 3 — Trip Details
-
-Fill in:
-- **Trip Name** — e.g. "Ooty Long Weekend 🏔️"
+### Step 2 — Details
+- **Trip Name**: e.g. "South Tamil Nadu Temple Tour"
 - **Start & End Dates**
-- **Budget** — total estimated spend in ₹
-- **Interests** (AI mode only) — e.g. "Waterfalls, Local food, Trekking" — this helps the AI pick the right attractions
+- **Total Budget** in ₹
+
+### Step 3 — Plan Mode
+| Mode | What it does |
+|------|-------------|
+| ✨ AI Planned | Generates a full day-wise itinerary automatically |
+| ✏️ Manual | You build the plan yourself |
+
+**For AI mode**: Select your interests (Temples, Nature, Food, etc.)
+→ Tap **Create with AI** — the AI researches real places, timings, and costs for your exact route.
 
 ---
 
-### Step 4 — Create
+## 3. Joining a Trip
 
-Tap **Create Trip 🚀**. The app will:
-1. Save your trip and route
-2. Generate a 6-character **Trip Code** (e.g. `XK7P2R`)
-3. Take you to the Trip Dashboard
+### Via Invite Link
+1. Organiser shares a link → tap it
+2. If not logged in, create an account first
+3. Tap **Join This Trip** → you're added instantly
 
----
-
-## 4. Inviting Members & Joining a Trip
-
-### As Organiser — Share the invite
-
-From the Trip Dashboard:
-1. Tap the **🔗 Share** button in the top-right header
-2. You'll see two options:
-   - **Invite Link** — a direct URL like `nam-payanam.vercel.app/join/YOUR_TRIP_ID`
-   - **Trip Code** — 6-character code (e.g. `XK7P2R`)
-3. Copy either one and share via WhatsApp / SMS
-
-### As a Member — Join via Link
-
-1. Open the invite link in your browser
-2. You'll see the trip details (name, route, dates)
-3. If you're not logged in, tap **Sign In to Join** — you'll be redirected back after login
-4. Tap **Join This Trip 🚀**
-5. You're added instantly and taken to the dashboard
-
-### As a Member — Join via Trip Code
-
-1. From the **Home page**, tap **Join a Trip**
-2. Enter the 6-character trip code
-3. Tap **Join** — you're in
-
-> **Note:** Once you join, you can see the itinerary, live map, expenses and check-ins. You cannot edit the itinerary (only the organiser can).
+### Via Trip Code
+1. From Home → tap **Join by Code**
+2. Enter the 6-character code (e.g. `ABC123`)
+3. Tap **Join** — you'll see the trip immediately
 
 ---
 
-## 5. Itinerary — AI Plan & Manual Editing
+## 4. Trip Dashboard
+
+The dashboard is your **command centre** for the trip:
+
+| Section | What you can do |
+|---------|----------------|
+| 📅 Itinerary | View & edit day-by-day plan |
+| 💸 Expenses | Add costs, split bills |
+| ⚖️ Settlements | See who owes whom |
+| 👥 Members | View group, share invite |
+| 🗺️ Live Map | GPS tracking + route |
+| 🤖 AI Assist | Ask anything about trip |
+| 📍 Check In | Pin your pickup location |
+
+### Starting a Trip (Organiser only)
+- Tap **Start Trip** → status changes to **Live 🟢**
+- This automatically activates live tracking on the map
+
+---
+
+## 5. Itinerary
 
 ### AI-Generated Plan
+- After creating with AI, tap **Itinerary** → see full day-wise plan
+- Each stop shows: time, location, description, estimated cost
+- Tap **🔄 AI** to regenerate if you don't like the plan
+- Tap **+ Add** to manually add extra stops
 
-1. From the Trip Dashboard → tap **Itinerary** tab
-2. If no plan exists, tap **Generate with AI ✨**
-3. The AI will:
-   - Search for real attractions, hotels and restaurants along your route
-   - Build a day-by-day plan with timings, costs and tips
-   - Show you the progress with animated status messages
-4. The plan appears as day-wise cards. Expand any day to see its stops.
-
-### Editing the Plan (Organiser only)
-
-**Edit a stop:**
-- Tap the ✎ pencil icon on any stop
-- Change the name, type, time, duration, cost, notes or coordinates
-- Tap **Save Changes**
-
-**Add a new stop:**
-- Tap **+ Add** in the header, or tap **+ Add stop to Day X** inside a day
-- Fill in the form and tap **Add Stop**
-
-**Delete a stop:**
-- Tap the 🗑️ trash icon on the stop → confirm
-
-**Re-generate:**
-- Tap the **AI** button in the header again
-- Confirm the warning (existing plan will be replaced)
-
-> **Tip:** You can mix AI + manual. Generate first with AI, then manually fine-tune stops.
+### Manual Plan
+- Tap **+ Add** → fill in Day, Time, Location, Description, Cost
+- Organiser can delete any stop by tapping ✕
 
 ---
 
-## 6. Live Map & GPS Tracking
-
-### For the Organiser — Go Live
-
-1. From the Dashboard → tap **Live Map** tab
-2. You'll see your full route with labelled pins (A, B, C…) and a dashed planned line
-3. Tap **Go Live 🚀** — your phone's GPS activates
-4. A **moving vehicle icon 🚗** appears on the map at your real position
-5. Your **speed** is shown in a card (bottom-left)
-6. **ETA to next destination** updates automatically
-7. All trip members see your movement in real time
-8. Tap **Stop GPS** when done
-
-### For Members — Watch the Map
-
-1. Open Live Map tab
-2. You'll see the organiser's vehicle moving on the map
-3. Check-in pins for other members show on the map too (see Section 7)
-4. No action needed — map updates every few seconds automatically
-
-### Route Line Legend
-
-| Line style | Meaning |
-|---|---|
-| Solid green line | Route already covered |
-| Dashed grey line | Planned route ahead |
-
----
-
-## 7. Check-In Feature
-
-Any trip member (including the organiser) can check in to show their current location on the Live Map.
-
-**Use case:** You're at the pickup point waiting for the car. Check in so the organiser sees exactly where you are on the map with your name.
-
-### How to Check In
-
-1. From Live Map → tap **Check In** (top-right of the map screen)
-2. The check-in form opens:
-   - **Your Location** — type the place name (e.g. "Salem Bus Stand")
-   - Tap the 📍 **GPS button** to auto-fill your current location from GPS
-3. Tap **Check In Here**
-
-### What Happens Next
-
-- A **named pin** appears on the Live Map at your location
-- It shows **"[Your Name] is waiting here"**
-- The organiser sees this pin while driving
-- All other members also see your pin
-- Check-ins are listed at the bottom of the check-in form so you can see the whole group's locations
-
-### Cancelling a Check-In
-
-Your check-in is active until you check in again (it replaces the old one automatically) or the trip ends.
-
----
-
-## 8. Expenses & Splitting Bills
+## 6. Expenses & Settlements
 
 ### Adding an Expense
+1. Go to **Expenses** → tap **+ Add**
+2. Enter **Amount** (₹)
+3. Type a **Description** (e.g. "Lunch at hotel")
+4. Pick a **Category**: Food, Travel, Stay, Activity, Shopping, Other
+5. Choose **How to split**:
+   - **÷ Equal Split** — divided equally among all members
+   - **⚖️ Custom** — set how much each person owes
 
-1. From Dashboard → tap **Expenses** tab
-2. Tap **+ Add**
-3. Fill in:
-   - **Amount (₹)** — the total you paid
-   - **Description** — e.g. "Lunch at Annapoorna"
-   - **Category** — Food / Travel / Stay / Activity / Shopping / Other
-4. Choose your **Split method**:
+### Settlements
+- Go to **Settlements** to see who owes whom
+- **You Owe** card shows your pending amount
+- **You Are Owed** shows what others owe you
+- Tap **Mark as Paid** once you've paid someone
+- The owed person's balance updates automatically
 
-| Split Type | How it works |
-|---|---|
-| **Equal** | Amount divided equally among all members. Each person's share is shown before you save. |
-| **Manual** | You enter exactly how much each person owes. A balance meter shows if the splits add up. |
-
-5. Tap **Add Expense 💰**
-
-> **Who should add expenses?** Whoever paid. If Ravi paid ₹1200 for fuel, Ravi adds the expense.
-
-### Viewing Expenses
-
-- All expenses appear grouped by date
-- Each card shows: description, category, who paid, and the amount
-- Expand any expense to see the per-person split breakdown
+> 💡 Tip: Add expenses as you go during the trip — don't wait till the end!
 
 ---
 
-## 9. Settlements — Who Pays Whom
+## 7. Live Map & Tracking
 
-The settlements page calculates the **minimum number of payments** needed to settle all dues.
+### For the Organiser
+1. Go to **Live Map** → tap **🚀 Go Live**
+2. Your GPS location is shared with ALL group members in real time
+3. Members see your moving 🚗 icon on the map
+4. Speed and ETA to next stop shown automatically
+5. Tap **Stop** to pause sharing
+6. Green line = path already covered; Dashed grey = remaining route
 
-### Reading the Page
+### For Members
+- Open **Live Map** to see the organiser's current position
+- Auto-refreshes every 5 seconds
+- ETA to destination shown at top
 
-At the top you'll see:
-- **You Are Owed ₹X** — others need to pay you this much
-- **You Owe ₹X** — you need to pay this to others
-
-Below that, **All Balances** shows every member's net position.
-
-**Recommended Payments** lists the exact transactions needed:
-> "Arjun pays Priya ₹340"
-
-### Marking a Payment Done
-
-1. When a payment happens (via UPI, cash, etc.), either the payer or receiver records it
-2. Find the relevant transaction card
-3. Tap **I have paid this** (if you're the payer) or **Mark as received** (if you're the receiver)
-4. The balance updates for everyone immediately — other members see the change in real time
-
-> **Important:** The app doesn't process money — it only records who paid whom. Use UPI/cash to actually transfer.
+### Share Trip with Family (Non-members)
+- Tap **Share** → copy the link
+- Anyone with the link can view the organiser's location (read-only)
 
 ---
 
-## 10. Profile & Account Settings
+## 8. Check-In Feature
 
-From the **Home page → tap your profile icon** (top-right):
+Use this when you're **joining the group mid-trip** (e.g. joining at Erode when group started from Salem).
+
+### How to Check In
+1. Go to **Check In** from the dashboard
+2. Tap **📡 Use GPS** to auto-detect your location, OR drag the pin on the map
+3. Choose your **icon** (🚗 Car, 📍 Pin, ⭐ Star, etc.)
+4. Add a **note** for the organiser (e.g. "Waiting near Gate 2, blue shirt")
+5. Tap **Send Check-in to Organiser**
+
+### What the Organiser Sees
+- Your icon appears on the **Live Map** at your exact location
+- A label shows: *"[Your Name] is waiting here"*
+- Organiser can navigate to your pin to pick you up
+
+---
+
+## 9. AI Assistant
+
+Your **24/7 travel companion** that knows your exact trip route!
+
+### Quick Actions (tap to ask instantly)
+| Button | What it does |
+|--------|-------------|
+| 🍽️ Best food stops | Real restaurant recommendations on your route |
+| 🏨 Hotel options | Accommodation for all budgets |
+| 💡 Budget tips | How to save money on this specific trip |
+| ⛽ Fuel stops | Petrol bunks along the way |
+| 🌦️ What to pack | Weather-based packing list |
+| 🚨 Emergency info | Hospitals, police stations on route |
+
+### Budget Analysis Tab
+- Switch to **💰 Budget** tab
+- AI breaks down your budget: accommodation, food, transport, activities
+- Shows daily spending limit
+- Warns if budget seems too low for the destination
+
+### Tips for Best Results
+- Ask specific questions: *"Which hotels near Ooty are good for families?"*
+- Ask for alternatives: *"We went over budget on food — what can we cut?"*
+- The AI remembers your conversation within the session
+
+---
+
+## 10. Members & Sharing
+
+### Invite Members
+From **Members** page:
+1. **Copy Link** — share via WhatsApp, SMS, etc.
+2. **Copy Code** — share the 6-character trip code (e.g. `AB1234`)
+
+Members join via link or by entering the code on the Home screen.
+
+### Removing a Member (Organiser only)
+- Members page → tap ✕ next to any non-organiser
+
+### Delete Trip (Organiser only)
+- Dashboard → tap 🗑️ in the header
+- Permanently deletes all data: itinerary, expenses, members
+
+---
+
+## 11. Profile & Settings
 
 ### Dark Mode
-
-Toggle the switch to switch between light and dark theme. The preference is saved on your device.
-
-### Sign Out
-
-Tap **Sign Out** → you'll be logged out and returned to the login screen.
+- Profile → toggle **Dark Mode** on/off
+- Setting is saved automatically
 
 ### Delete Account
-
-> ⚠️ **This is permanent and cannot be undone.**
-
-1. Tap **Delete Account** (red option at the bottom)
-2. Read the warning — this will delete ALL your trips, expenses and data
-3. Tap **Yes, Delete My Account**
-4. On the second screen, type exactly: `delete my account`
-5. Tap **CONFIRM DELETE**
-
-Your account, trips and all data are permanently removed.
+1. Profile → tap **Delete Account**
+2. Read the warning — this deletes ALL your trips and data
+3. Type **DELETE** to confirm
+4. Account and all associated data is permanently removed
 
 ---
 
-## 11. Quick Reference (FAQ)
+## 🆘 Troubleshooting
 
-**Q: Can I join a trip without creating an account?**
-A: No. You need to sign up with an email to join. This ensures your expenses and check-ins are tied to you.
-
-**Q: Can members edit the itinerary?**
-A: No. Only the trip organiser can add, edit or delete itinerary stops.
-
-**Q: What if GPS doesn't work on the Live Map?**
-A: Ensure your browser has location permission. In Chrome: tap the lock icon in the address bar → Allow Location.
-
-**Q: Who can mark settlements as paid?**
-A: Either the person who paid (payer) or the person who received the money.
-
-**Q: Can I be in multiple trips at once?**
-A: Yes. All your trips appear on the Home page.
-
-**Q: What if the AI plan doesn't look right?**
-A: You can tap **Generate with AI** again for a fresh plan, or manually edit individual stops.
-
-**Q: My invite link doesn't work?**
-A: Make sure the trip hasn't been deleted. Ask the organiser to share a fresh link from the Members page.
-
-**Q: I accidentally deleted an expense — can I recover it?**
-A: No. Deletions are permanent. Re-add the expense manually.
-
-**Q: Does the app work offline?**
-A: No. You need internet for all features including the map, AI, and real-time updates.
-
-**Q: How is my location data used?**
-A: GPS is only shared within your trip group while you have Go Live active. It is not stored permanently after the trip ends.
+| Problem | Solution |
+|---------|----------|
+| Map not loading | Check internet connection, refresh page |
+| AI not responding | Wait 30 seconds and retry (model may be busy) |
+| GPS not tracking | Allow location permission in browser settings |
+| Trip code not working | Check for typos — codes are 6 characters, uppercase |
+| Can't see members | They need to have joined via link or code first |
+| Expenses not updating | Pull to refresh or tap 🔄 |
 
 ---
 
-## Glossary
+## 📱 Best Practices
 
-| Term | Meaning |
-|---|---|
-| Organiser | The person who created the trip. Has full edit access. |
-| Member | Anyone who joined the trip via invite link or trip code. |
-| Trip Code | 6-character code (e.g. `XK7P2R`) used to join a trip. |
-| Go Live | Organiser starts GPS sharing so members see vehicle movement. |
-| Check-In | Any member marks their location on the map to show the group where they are. |
-| Settlement | Recording that a payment has been made between two members. |
-| Split | How an expense is divided among members (equal or custom amounts). |
+1. **Organiser**: Start GPS tracking before leaving, not after
+2. **Members**: Check in 30 minutes before your pickup point
+3. **Expenses**: Add them immediately — memory fades!
+4. **AI**: Regenerate itinerary if the initial plan doesn't match your style
+5. **Map**: Keep screen on during navigation for best tracking
 
 ---
 
-*Nam Payanam v2 · நம் பயணம் — உங்கள் பயண தோழன்*
-*Built for Indian travellers 🇮🇳*
+*Made with ❤️ for Indian travellers · நம் பயணம் · Nam Payanam*
