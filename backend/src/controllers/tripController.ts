@@ -1,13 +1,13 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { tripService } from '../services/tripService';
-import { generateItinerary } from '../services/aiService'; // ✅ FIXED IMPORT
+import { aiService } from '../services/aiService'; // ✅ FIXED
 import { supabaseAdmin } from '../config/db';
 import { getRealRoute } from '../utils/routeUtils';
 
 export const tripController = {
 
-  // ✅ CREATE TRIP (FIXED AI + ROUTE + DATA FLOW)
+  // ✅ CREATE TRIP
   createTrip: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const {
@@ -31,7 +31,7 @@ export const tripController = {
 
       const userId = req.user.id;
 
-      // 🔥 ROUTE FIX
+      // 🔥 ROUTE CALCULATION
       let routeCoords: [number, number][] = [];
 
       if (start_lat && start_lng && destination_lat && destination_lng) {
@@ -40,7 +40,7 @@ export const tripController = {
             [Number(start_lat), Number(start_lng)],
             [Number(destination_lat), Number(destination_lng)]
           );
-        } catch (err) {
+        } catch {
           console.warn("⚠️ Route fetch failed");
         }
       }
@@ -54,16 +54,16 @@ export const tripController = {
         name,
         destination,
         start_location,
-        destination_lat: destination_lat ? Number(destination_lat) : null,
-        destination_lng: destination_lng ? Number(destination_lng) : null,
-        start_lat: start_lat ? Number(start_lat) : null,
-        start_lng: start_lng ? Number(start_lng) : null,
+        destination_lat: destination_lat ? Number(destination_lat) : undefined,
+        destination_lng: destination_lng ? Number(destination_lng) : undefined,
+        start_lat: start_lat ? Number(start_lat) : undefined,
+        start_lng: start_lng ? Number(start_lng) : undefined,
         route: routeCoords.length
           ? { type: "LineString", coordinates: routeCoords }
-          : null,
+          : undefined,
         start_date,
         end_date,
-        budget: Number(budget),
+        budget: budget ? Number(budget) : 0,
         mode,
         status: 'PLANNING',
         trip_code: tripCode,
@@ -76,7 +76,7 @@ export const tripController = {
         role: 'ORGANIZER'
       });
 
-      // 🤖 AI ITINERARY FIX (CRITICAL)
+      // 🤖 AI ITINERARY
       if (mode === 'AI' && interests && start_location) {
         try {
           const days =
@@ -85,13 +85,13 @@ export const tripController = {
               (1000 * 60 * 60 * 24)
             ) + 1;
 
-          const aiResponse = await generateItinerary(
+          const aiResponse = await aiService.generateItinerary(
             `${days} day trip from ${start_location} to ${destination} with budget ${budget}. Interests: ${interests}`
           );
 
           if (aiResponse?.days) {
             const items = aiResponse.days.flatMap((day: any) =>
-              day.activities.map((act: any) => ({
+              (day.activities || []).map((act: any) => ({
                 trip_id: newTrip.id,
                 day: day.day,
                 title: act.place,
@@ -118,7 +118,7 @@ export const tripController = {
     }
   },
 
-  // ✅ GET MY TRIPS (unchanged but safe)
+  // ✅ GET MY TRIPS
   getMyTrips: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const userId = req.user!.id;
@@ -130,7 +130,9 @@ export const tripController = {
 
       const ids = members?.map((m: any) => m.trip_id) || [];
 
-      if (!ids.length) return res.json({ success: true, data: [] });
+      if (!ids.length) {
+        return res.json({ success: true, data: [] });
+      }
 
       const { data: trips } = await supabaseAdmin
         .from('trips')
@@ -167,22 +169,18 @@ export const tripController = {
     }
   },
 
-  // 🔥 JOIN TRIP FIX (CRITICAL)
+  // ✅ JOIN TRIP
   joinTrip: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { tripId } = req.params;
       const userId = req.user!.id;
-
-      if (!tripId) {
-        return res.status(400).json({ success: false, error: 'Trip ID required' });
-      }
 
       const { data: existing } = await supabaseAdmin
         .from('trip_members')
         .select('id')
         .eq('trip_id', tripId)
         .eq('user_id', userId)
-        .maybeSingle(); // ✅ FIX
+        .maybeSingle();
 
       if (existing) {
         return res.json({ success: true, message: 'Already joined' });
@@ -206,7 +204,7 @@ export const tripController = {
     }
   },
 
-  // 🔥 MEMBERS FIX (nickname issue)
+  // ✅ GET MEMBERS
   getMembers: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { tripId } = req.params;
