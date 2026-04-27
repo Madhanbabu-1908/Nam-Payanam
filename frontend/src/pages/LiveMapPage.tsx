@@ -122,7 +122,7 @@ export default function LiveMapPage() {
       });
       const m = L.marker([wp.lat,wp.lng],{icon}).addTo(map)
         .bindPopup(`<b style="font-size:13px">${wp.name}</b><br/><small style="text-transform:capitalize;color:#6b7280">${wp.type}</small>`);
-      m._custom=true; markersRef.current.push(m);
+      (m as any)._custom = true; markersRef.current.push(m);
       bounds.push([wp.lat,wp.lng]);
     });
 
@@ -137,7 +137,7 @@ export default function LiveMapPage() {
       });
       const m = L.marker([+c.latitude,+c.longitude],{icon,zIndexOffset:500}).addTo(map)
         .bindPopup(`<b>${CHECKIN_ICONS[c.icon]||'📍'} ${c.location_name}</b><br/><small style="color:#6b7280">${c.profile?.full_name||c.profile?.email?.split('@')[0]||'Member'} is waiting here</small>`);
-      m._custom=true; markersRef.current.push(m);
+      (m as any)._custom = true; markersRef.current.push(m);
       bounds.push([+c.latitude,+c.longitude]);
     });
 
@@ -150,12 +150,12 @@ export default function LiveMapPage() {
             const geo = d.routes[0].geometry.coordinates.map((c:number[])=>[c[1],c[0]]);
             // Grey planned line
             const pl = L.polyline(geo,{color:'#94A3B8',weight:4,opacity:0.5,dashArray:'10 6'}).addTo(map);
-            pl._custom=true; markersRef.current.push(pl);
+            (pl as any)._custom = true; markersRef.current.push(pl);
           }
         }).catch(()=>{
           // Fallback dashed line
           const pl = L.polyline(waypoints.map(w=>[w.lat,w.lng]),{color:'#94A3B8',weight:3,dashArray:'8 6',opacity:0.5}).addTo(map);
-          pl._custom=true; markersRef.current.push(pl);
+          (pl as any)._custom = true; markersRef.current.push(pl);
         });
     }
 
