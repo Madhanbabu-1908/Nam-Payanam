@@ -1,154 +1,202 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../config/api';
-import { ArrowLeft, MapPin, CheckCircle, Clock, Users, Send } from 'lucide-react';
-import { Button } from '../components/common/Button';
+import { useAuth } from '../context/AuthContext';
+import { ArrowLeft, MapPin, Send, CheckCircle, Clock } from 'lucide-react';
+
+declare const L: any;
+
+const ICONS = [
+  { id: 'PIN',  emoji: '📍', label: 'Pin' },
+  { id: 'CAR',  emoji: '🚗', label: 'Car' },
+  { id: 'STAR', emoji: '⭐', label: 'Star' },
+  { id: 'HOME', emoji: '🏠', label: 'Home' },
+  { id: 'FLAG', emoji: '🚩', label: 'Flag' },
+  { id: 'FOOD', emoji: '🍽️', label: 'Food' },
+  { id: 'FUEL', emoji: '⛽', label: 'Fuel' },
+  { id: 'REST', emoji: '☕', label: 'Rest' },
+];
 
 export default function CheckinPage() {
   const { tripId } = useParams();
   const navigate = useNavigate();
-  const [checkins, setCheckins] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [location, setLocation] = useState('');
-  const [checkingIn, setCheckingIn] = useState(false);
+  const { user } = useAuth();
+  const mapRef  = useRef<HTMLDivElement>(null);
+  const mapInst = useRef<any>(null);
+  const pinRef  = useRef<any>(null);
+
+  const [locationName, setLocationName] = useState('');
+  const [note, setNote]       = useState('');
+  const [icon, setIcon]       = useState('PIN');
+  const [lat, setLat]         = useState<number | null>(null);
+  const [lng, setLng]         = useState<number | null>(null);
+  const [saving, setSaving]   = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [myCheckins, setMyCheckins] = useState<any[]>([]);
+  const [locating, setLocating] = useState(false);
 
   useEffect(() => {
-    if (!tripId) return;
-    fetchCheckins();
-    
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(fetchCheckins, 30000);
-    return () => clearInterval(interval);
+    // Load existing checkins
+    api.get(`/checkin/trip/${tripId}`).then(r => setMyCheckins(r.data.data || [])).catch(() => {});
   }, [tripId]);
 
-  const fetchCheckins = async () => {
-    try {
-      const res = await api.get(`/checkins/trip/${tripId}`);
-      if (res.data.success) {
-        setCheckins(res.data.data || []);
+  // Init map
+  useEffect(() => {
+    if (!mapRef.current || mapInst.current || !window.L) return;
+    const defaultCenter: [number, number] = [11.0, 77.0];
+    const map = L.map(mapRef.current, { zoomControl: true, attributionControl: false }).setView(defaultCenter, 10);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+    mapInst.current = map;
+
+    const icon = L.divIcon({
+      html: `<div style="font-size:28px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4))">📍</div>`,
+      className: '', iconSize: [28, 36], iconAnchor: [14, 36],
+    });
+    const pin = L.marker(defaultCenter, { icon, draggable: true }).addTo(map);
+    pinRef.current = pin;
+
+    const revGeo = async (lat: number, lng: number) => {
+      setLat(lat); setLng(lng);
+      try {
+        const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, { headers: { 'User-Agent': 'NamPayanam/2.0' } });
+        const d = await r.json();
+        const name = d.address?.city || d.address?.town || d.address?.village || d.address?.suburb || d.display_name?.split(',')[0] || '';
+        setLocationName(name);
+      } catch {}
+    };
+
+    pin.on('dragend', () => { const { lat, lng } = pin.getLatLng(); revGeo(lat, lng); });
+    map.on('click', (e: any) => { pin.setLatLng(e.latlng); revGeo(e.latlng.lat, e.latlng.lng); });
+  }, []);
+
+  const useCurrentLocation = () => {
+    if (!navigator.geolocation) return alert('GPS not available');
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(pos => {
+      const { latitude, longitude } = pos.coords;
+      setLat(latitude); setLng(longitude);
+      if (mapInst.current && pinRef.current) {
+        mapInst.current.setView([latitude, longitude], 15);
+        pinRef.current.setLatLng([latitude, longitude]);
       }
-    } catch (error) {
-      console.error("Failed to load check-ins", error);
-    } finally {
-      setLoading(false);
-    }
+      fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`, { headers: { 'User-Agent': 'NamPayanam/2.0' } })
+        .then(r => r.json()).then(d => {
+          setLocationName(d.address?.city || d.address?.town || d.address?.suburb || d.display_name?.split(',')[0] || '');
+        }).catch(() => {}).finally(() => setLocating(false));
+    }, err => { alert(err.message); setLocating(false); }, { enableHighAccuracy: true, timeout: 10000 });
   };
 
-  const handleCheckIn = async () => {
-    if (!location.trim()) {
-      alert("Please enter your location");
-      return;
-    }
-
-    setCheckingIn(true);
+  const handleSubmit = async () => {
+    if (!locationName.trim()) return alert('Please enter a location name');
+    setSaving(true);
     try {
-      await api.post('/checkins', { 
-        tripId, 
-        locationName: location, 
-        status: 'PRESENT' 
-      });
-      setLocation('');      await fetchCheckins(); // Refresh list immediately
-      alert("✅ Checked in successfully!");
-    } catch (e: any) { 
-      alert("❌ Failed to check in: " + (e.response?.data?.error || e.message)); 
-    } finally {
-      setCheckingIn(false);
-    }
+      await api.post('/checkin', { tripId, locationName: locationName.trim(), latitude: lat, longitude: lng, icon, note });
+      setSuccess(true);
+      setTimeout(() => navigate(-1), 1500);
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to check in');
+    } finally { setSaving(false); }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const map: Record<string, string> = { WAITING: 'bg-amber-100 text-amber-700', PICKED_UP: 'bg-jade/10 text-jade', ARRIVED: 'bg-indigo-100 text-indigo-700' };
+    return map[status] || 'bg-slate-100 text-slate-600';
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-20 transition-colors duration-300">
-      {/* Header */}
-      <header className="glass sticky top-0 z-20 px-6 py-4 flex items-center gap-3 backdrop-blur-md bg-white/80 dark:bg-slate-800/80 border-b border-slate-200/50 dark:border-slate-700">
-        <button onClick={() => navigate(-1)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition">
-          <ArrowLeft className="text-slate-600 dark:text-slate-300"/>
-        </button>
-        <h1 className="font-bold text-lg text-slate-800 dark:text-white">Safety Check-in</h1>
+    <div className="page pt-safe">
+      <header className="glass sticky top-0 z-20 px-4 py-3">
+        <div className="flex items-center gap-3 max-w-2xl mx-auto">
+          <button onClick={() => navigate(-1)} className="btn-icon bg-[var(--bg)]">
+            <ArrowLeft size={20} className="text-[var(--muted)]"/>
+          </button>
+          <h1 className="font-display font-bold text-[var(--text)] flex-1">Check In</h1>
+        </div>
       </header>
 
-      <main className="p-6 space-y-6 animate-fade-in max-w-3xl mx-auto">
-        
-        {/* Check-in Form Card */}
-        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
-          <h2 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2 text-lg">
-            <MapPin className="text-indigo-600"/> Where are you right now?
-          </h2>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <input 
-              type="text" 
-              placeholder="e.g., Hotel Lobby, Bus Stop, Trekking Point" 
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              disabled={checkingIn}
-              className="flex-1 p-4 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-white placeholder-slate-400"
-            />
-            <Button 
-              onClick={handleCheckIn} 
-              isLoading={checkingIn}
-              disabled={checkingIn || !location.trim()}
-              className="whitespace-nowrap px-6 flex items-center gap-2"
-            >
-              <Send size={18} /> Check In
-            </Button>
+      <main className="max-w-2xl mx-auto px-4 pt-4 space-y-4 pb-32">
+        {success ? (
+          <div className="flex flex-col items-center justify-center py-20 animate-pop">
+            <CheckCircle size={64} className="text-jade mb-4"/>
+            <p className="font-display font-bold text-[var(--text)] text-xl">Checked In!</p>
+            <p className="text-[var(--muted)] text-sm mt-1">Organiser can see your location on the map</p>
           </div>
-        </div>
+        ) : (
+          <>
+            {/* Map */}
+            <div className="card p-0 overflow-hidden">
+              <div className="px-4 py-3 border-b border-[var(--border)] flex items-center justify-between">
+                <p className="font-bold text-[var(--text)] text-sm flex items-center gap-2"><MapPin size={15} className="text-brand"/>Tap map or drag pin to your location</p>
+                <button onClick={useCurrentLocation} disabled={locating}
+                  className="text-xs text-brand font-bold flex items-center gap-1 bg-brand/10 px-2.5 py-1.5 rounded-xl">
+                  {locating ? <div className="w-3 h-3 border border-brand border-t-transparent rounded-full animate-spin"/> : '📡'}
+                  {locating ? 'Locating…' : 'Use GPS'}
+                </button>
+              </div>
+              <div ref={mapRef} style={{ height: 240 }}/>
+            </div>
 
-        {/* Group Status List */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2 text-lg">              <Users size={20}/> Group Status
-            </h3>
-            <span className="text-xs text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-full">
-              {checkins.length} Members Active
-            </span>
-          </div>
-          
-          {loading ? (
-            <div className="text-center py-12">
-              <div className="animate-spin h-8 w-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto mb-3"></div>
-              <p className="text-slate-400">Loading group status...</p>
+            {/* Icon picker */}
+            <div className="card p-4">
+              <label className="label">Your icon on the map</label>
+              <div className="flex gap-2 flex-wrap mt-2">
+                {ICONS.map(i => (
+                  <button key={i.id} onClick={() => setIcon(i.id)}
+                    className={`flex flex-col items-center gap-1 w-14 py-2 rounded-xl border-2 text-xs font-bold transition-all
+                      ${icon === i.id ? 'border-brand bg-brand/10 text-brand' : 'border-[var(--border)] text-[var(--muted)]'}`}>
+                    <span className="text-xl">{i.emoji}</span>
+                    {i.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          ) : checkins.length === 0 ? (
-            <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl text-center border border-dashed border-slate-300 dark:border-slate-700">
-              <Users className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500 dark:text-slate-400">No one has checked in yet.</p>
-              <p className="text-xs text-slate-400 mt-1">Be the first to share your location!</p>
+
+            {/* Location name + note */}
+            <div className="card p-4 space-y-3">
+              <div>
+                <label className="label">Location Name *</label>
+                <input className="input" placeholder="e.g. Salem Bus Stand Gate 2"
+                  value={locationName} onChange={e => setLocationName(e.target.value)}/>
+              </div>
+              <div>
+                <label className="label">Note for organiser (optional)</label>
+                <input className="input" placeholder="e.g. Waiting near the entrance, wearing blue shirt"
+                  value={note} onChange={e => setNote(e.target.value)}/>
+              </div>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {checkins.map((c) => (
-                <div key={c.id} className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 flex justify-between items-center hover:shadow-md transition">
-                  <div className="flex items-center gap-4">
-                    <div className={`h-12 w-12 rounded-full flex items-center justify-center ${
-                      c.status === 'PRESENT' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-red-100 text-red-600'
-                    }`}>
-                      {c.status === 'PRESENT' ? <CheckCircle size={24}/> : <Clock size={24}/>}
+
+            {/* My past checkins */}
+            {myCheckins.length > 0 && (
+              <div className="card p-4">
+                <p className="font-bold text-[var(--text)] text-sm mb-3 flex items-center gap-2"><Clock size={15} className="text-[var(--muted)]"/>My Recent Check-ins</p>
+                <div className="space-y-2">
+                  {myCheckins.slice(0, 3).map(c => (
+                    <div key={c.id} className="flex items-center gap-3 py-2 border-b border-[var(--border)] last:border-0">
+                      <span className="text-xl">{ICONS.find(i => i.id === c.icon)?.emoji || '📍'}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-[var(--text)] truncate">{c.location_name}</p>
+                        <p className="text-xs text-[var(--muted)]">{new Date(c.checked_in_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+                      </div>
+                      <span className={`badge text-[10px] ${getStatusBadge(c.status)}`}>{c.status}</span>
                     </div>
-                    <div>
-                      <p className="font-bold text-slate-800 dark:text-white text-base">
-                        {c.user?.email?.split('@')[0] || c.user?.full_name || 'Member'}
-                      </p>
-                      <p className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
-                        <MapPin size={14}/> {c.location_name}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className={`text-xs font-bold px-2 py-1 rounded-full block mb-1 ${
-                      c.status === 'PRESENT' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-red-100 text-red-700'
-                    }`}>
-                      {c.status}
-                    </span>
-                    <p className="text-xs text-slate-400">
-                      {new Date(c.checked_in_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                    </p>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>          )}
-        </div>
-
+              </div>
+            )}
+          </>
+        )}
       </main>
+
+      {!success && (
+        <div className="fixed bottom-0 left-0 right-0 bg-[var(--surface)] border-t border-[var(--border)] px-4 py-4 pb-safe">
+          <div className="max-w-2xl mx-auto">
+            <button onClick={handleSubmit} disabled={saving || !locationName.trim()} className="btn-primary w-full py-4 text-base disabled:opacity-40">
+              {saving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/> : <Send size={18}/>}
+              {saving ? 'Sending…' : 'Send Check-in to Organiser'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

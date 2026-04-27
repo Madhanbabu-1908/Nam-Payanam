@@ -2,368 +2,324 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../config/api';
 import { useAuth } from '../context/AuthContext';
-import { ArrowLeft, Navigation, Copy, CheckCircle, Play, Square, MapPin } from 'lucide-react';
+import { ArrowLeft, Copy, Check, Navigation, Square } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 declare const L: any;
 
-const MEMBER_ICONS = ['🧑','👩','🧔','👱','🙋','🙍','🧕','👲'];
-const VEHICLE_COLORS = ['#FF6B35','#10B981','#3B82F6','#8B5CF6','#F59E0B'];
+const CHECKIN_ICONS: Record<string,string> = {
+  PIN:'📍', CAR:'🚗', STAR:'⭐', HOME:'🏠', FLAG:'🚩', FOOD:'🍽️', FUEL:'⛽', REST:'☕'
+};
 
-const PIN = (label:string, color:string, pulse=false) => `
-  <div style="position:relative;display:flex;flex-direction:column;align-items:center">
-    ${pulse?`<div style="position:absolute;top:-4px;left:-4px;width:46px;height:46px;background:${color};border-radius:50%;opacity:.25;animation:ping 1.5s infinite"></div>`:''}
-    <div style="width:38px;height:38px;background:${color};border:3px solid white;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 3px 10px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center">
-      <span style="transform:rotate(45deg);font-size:14px">${label}</span>
-    </div>
-  </div>`;
-
-const WAITING_PIN = (memberName:string, icon:string, color:string) => `
-  <div style="position:relative;display:flex;flex-direction:column;align-items:center">
-    <div style="background:white;border:3px solid ${color};border-radius:12px;padding:4px 8px;box-shadow:0 3px 10px rgba(0,0,0,.2);white-space:nowrap;font-size:11px;font-weight:700;color:#1f2937;display:flex;align-items:center;gap:4px">
-      <span>${icon}</span><span>${memberName} is waiting</span>
-    </div>
-    <div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid ${color};margin-top:-1px"></div>
-  </div>`;
+function haversine(a:{lat:number,lng:number}, b:{lat:number,lng:number}) {
+  const R=6371, dLat=(b.lat-a.lat)*Math.PI/180, dLng=(b.lng-a.lng)*Math.PI/180;
+  const x = Math.sin(dLat/2)**2 + Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
+}
 
 export default function LiveMapPage() {
-  const { tripId }  = useParams();
-  const navigate    = useNavigate();
-  const { user }    = useAuth();
+  const { tripId } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
   const mapRef      = useRef<HTMLDivElement>(null);
   const mapInst     = useRef<any>(null);
-  const vehicleMk   = useRef<any>(null);
-  const routeLine   = useRef<any>(null);
-  const doneLine    = useRef<any>(null);
-  const pathPts     = useRef<[number,number][]>([]);
+  const vehicleMark = useRef<any>(null);
+  const pathLine    = useRef<any>(null);
+  const markersRef  = useRef<any[]>([]);
   const watchRef    = useRef<number|null>(null);
+  const pathCoords  = useRef<[number,number][]>([]);
   const lastPush    = useRef(0);
-  const checkinMks  = useRef<Record<string,any>>({});
 
   const [trip, setTrip]         = useState<any>(null);
-  const [tracking, setTracking] = useState(false);
-  const [speed, setSpeed]       = useState(0);
-  const [waypoints, setWps]     = useState<any[]>([]);
-  const [livePos, setLivePos]   = useState<{lat:number;lng:number}|null>(null);
-  const [mapReady, setMapReady] = useState(false);
-  const [isOrg, setIsOrg]       = useState(false);
-  const [eta, setEta]           = useState<string|null>(null);
-  const [copied, setCopied]     = useState(false);
-  const [progressPct, setPct]   = useState(0);
+  const [waypoints, setWaypoints] = useState<any[]>([]);
   const [checkins, setCheckins] = useState<any[]>([]);
-  // check-in form
-  const [showCheckin, setShowCheckin] = useState(false);
-  const [ciLocation, setCiLoc]        = useState('');
-  const [ciLat, setCiLat]             = useState<number|null>(null);
-  const [ciLng, setCiLng]             = useState<number|null>(null);
-  const [ciGetting, setCiGetting]     = useState(false);
-  const [ciSaving, setCiSaving]       = useState(false);
-
-  const dist = (a:any,b:any) => {
-    const R=6371,dLat=(b.lat-a.lat)*Math.PI/180,dLng=(b.lng-a.lng)*Math.PI/180;
-    const x=Math.sin(dLat/2)**2+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLng/2)**2;
-    return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
-  };
+  const [tracking, setTracking] = useState(false);
+  const [livePos, setLivePos]   = useState<{lat:number,lng:number,speed:number}|null>(null);
+  const [eta, setEta]           = useState<string|null>(null);
+  const [speed, setSpeed]       = useState(0);
+  const [progress, setProgress] = useState(0);
+  const [copied, setCopied]     = useState(false);
+  const [isOrg, setIsOrg]       = useState(false);
+  const [mapReady, setMapReady] = useState(false);
 
   // Load trip + checkins
-  const loadData = useCallback(async()=>{
+  useEffect(() => {
     if (!tripId) return;
-    try {
-      const [tRes, cRes] = await Promise.all([
-        api.get(`/trips/${tripId}`),
-        api.get(`/checkins/trip/${tripId}`).catch(()=>({data:{data:[]}})),
-      ]);
-      const t = tRes.data.data;
+    Promise.all([
+      api.get(`/trips/${tripId}`),
+      api.get(`/checkin/trip/${tripId}`).catch(()=>({data:{data:[]}})),
+    ]).then(([tripRes, checkinRes]) => {
+      const t = tripRes.data.data;
       setTrip(t);
-      setIsOrg(t.organizer_id===user?.id);
-      const wps:any[]=[];
-      if(t.start_lat&&t.start_lng) wps.push({name:t.start_location||'Start',lat:+t.start_lat,lng:+t.start_lng,type:'start'});
-      (t.stops||[]).forEach((s:any,i:number)=>{ if(s.lat&&s.lng) wps.push({name:s.name||`Stop ${i+1}`,lat:+s.lat,lng:+s.lng,type:'stop'}); });
-      if(t.destination_lat&&t.destination_lng) wps.push({name:t.destination,lat:+t.destination_lat,lng:+t.destination_lng,type:'end'});
-      setWps(wps);
-      setCheckins(cRes.data.data||[]);
-    } catch(e){ console.error(e); }
-  },[tripId,user]);
+      setIsOrg(t.organizer_id === user?.id);
+      setCheckins(checkinRes.data.data || []);
 
-  useEffect(()=>{ loadData(); const iv=setInterval(loadData,20000); return()=>clearInterval(iv); },[loadData]);
+      // Build waypoints
+      const wps: any[] = [];
+      if (t.start_lat && t.start_lng)
+        wps.push({ name: t.start_location || 'Start', lat:+t.start_lat, lng:+t.start_lng, type:'start' });
+      (t.waypoints || []).forEach((w:any) => {
+        if (w.lat && w.lng) wps.push({ name: w.name, lat:+w.lat, lng:+w.lng, type:'stop' });
+      });
+      if (t.destination_lat && t.destination_lng)
+        wps.push({ name: t.destination, lat:+t.destination_lat, lng:+t.destination_lng, type:'end' });
+      setWaypoints(wps);
 
-  // Load path history
-  useEffect(()=>{
-    if (!tripId) return;
-    api.get(`/tracking/trips/${tripId}/path`).then(r=>{
-      pathPts.current = (r.data.data||[]).map((p:any)=>[+p.latitude,+p.longitude]);
-    }).catch(()=>{});
-  },[tripId]);
+      // Load path history
+      api.get(`/tracking/trips/${tripId}/path`).then(r => {
+        pathCoords.current = (r.data.data||[]).map((p:any)=>[+p.latitude,+p.longitude]);
+      }).catch(()=>{});
+    }).catch(console.error);
+  }, [tripId, user]);
+
+  // Real-time: poll live location every 5s for members
+  useEffect(() => {
+    if (!tripId || isOrg) return;
+    const iv = setInterval(() => {
+      api.get(`/tracking/trips/${tripId}/location`).then(r => {
+        const d = r.data.data;
+        if (d) {
+          setLivePos({ lat:+d.latitude, lng:+d.longitude, speed:+d.speed||0 });
+          setSpeed(+d.speed||0);
+          pathCoords.current.push([+d.latitude,+d.longitude]);
+        }
+      }).catch(()=>{});
+    }, 5000);
+    return () => clearInterval(iv);
+  }, [tripId, isOrg]);
 
   // Init Leaflet
-  useEffect(()=>{
-    if (!mapRef.current||mapInst.current||!L||waypoints.length===0) return;
-    const c = waypoints[0]?[waypoints[0].lat,waypoints[0].lng]:[11.0,77.0];
-    const map=L.map(mapRef.current,{zoomControl:false,attributionControl:false}).setView(c,10);
+  useEffect(() => {
+    if (!mapRef.current || mapInst.current || !window.L || waypoints.length===0) return;
+    const c = waypoints[0];
+    const map = L.map(mapRef.current, { zoomControl:false, attributionControl:false }).setView([c.lat,c.lng], 9);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
     L.control.zoom({position:'bottomright'}).addTo(map);
-    mapInst.current=map;
+    mapInst.current = map;
     setMapReady(true);
-  },[waypoints]);
+  }, [waypoints]);
 
-  // Draw waypoints + route + check-ins
-  useEffect(()=>{
-    const map=mapInst.current;
-    if (!map||!L||!mapReady) return;
+  // Draw everything on map
+  const redraw = useCallback(() => {
+    const map = mapInst.current;
+    if (!map || !window.L || waypoints.length===0) return;
+    const L = window.L;
 
-    // Clear route/stop layers
-    map.eachLayer((l:any)=>{ if(l._np) map.removeLayer(l); });
-    Object.values(checkinMks.current).forEach((m:any)=>map.removeLayer(m));
-    checkinMks.current={};
-    if(routeLine.current) map.removeLayer(routeLine.current);
-    if(doneLine.current)  map.removeLayer(doneLine.current);
+    // Clear custom layers
+    markersRef.current.forEach(m => map.removeLayer(m));
+    markersRef.current = [];
 
-    const bounds:[number,number][]=[];
-    const colors={start:'#10B981',end:'#EF4444',stop:'#3B82F6'};
+    const colors: Record<string,string> = { start:'#10B981', stop:'#0EA5E9', end:'#FF6B35' };
+    const bounds: [number,number][] = [];
 
-    waypoints.forEach((wp,i)=>{
-      const color=(colors as any)[wp.type]||'#6366f1';
-      const icon=L.divIcon({html:PIN(i===0?'🏠':'🏁',color),className:'',iconSize:[38,44],iconAnchor:[19,44]});
-      const m=L.marker([wp.lat,wp.lng],{icon}).addTo(map).bindPopup(`<b>${wp.name}</b>`);
-      m._np=true; bounds.push([wp.lat,wp.lng]);
+    // Route stop markers (Google Maps style circles)
+    waypoints.forEach((wp, i) => {
+      const color = colors[wp.type]||'#6366F1';
+      const icon = L.divIcon({
+        html: `<div style="width:36px;height:36px;background:${color};border:3px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:13px;font-weight:900;box-shadow:0 3px 10px rgba(0,0,0,.25)">${i+1}</div>`,
+        className:'', iconSize:[36,36], iconAnchor:[18,18]
+      });
+      const m = L.marker([wp.lat,wp.lng],{icon}).addTo(map)
+        .bindPopup(`<b style="font-size:13px">${wp.name}</b><br/><small style="text-transform:capitalize;color:#6b7280">${wp.type}</small>`);
+      m._custom=true; markersRef.current.push(m);
+      bounds.push([wp.lat,wp.lng]);
     });
 
-    // Planned dashed line
-    if(waypoints.length>=2){
-      const l=L.polyline(waypoints.map(w=>[w.lat,w.lng]),{color:'#94a3b8',weight:4,dashArray:'10 6',opacity:.7}).addTo(map);
-      l._np=true;
+    // Checkin markers
+    checkins.forEach(c => {
+      if (!c.latitude||!c.longitude) return;
+      const emoji = CHECKIN_ICONS[c.icon]||'📍';
+      const icon = L.divIcon({
+        html: `<div style="background:white;border:2.5px solid #FF6B35;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 2px 8px rgba(0,0,0,.2)">${emoji}</div>
+               <div style="position:absolute;top:40px;left:50%;transform:translateX(-50%);background:#1F2937;color:white;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;white-space:nowrap">${c.location_name}</div>`,
+        className:'', iconSize:[36,36], iconAnchor:[18,18]
+      });
+      const m = L.marker([+c.latitude,+c.longitude],{icon,zIndexOffset:500}).addTo(map)
+        .bindPopup(`<b>${CHECKIN_ICONS[c.icon]||'📍'} ${c.location_name}</b><br/><small style="color:#6b7280">${c.profile?.full_name||c.profile?.email?.split('@')[0]||'Member'} is waiting here</small>`);
+      m._custom=true; markersRef.current.push(m);
+      bounds.push([+c.latitude,+c.longitude]);
+    });
+
+    // OSRM route line — fetch and draw
+    if (waypoints.length >= 2) {
+      const coords = waypoints.map(w=>`${w.lng},${w.lat}`).join(';');
+      fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`)
+        .then(r=>r.json()).then(d=>{
+          if (d.code==='Ok'&&d.routes[0]) {
+            const geo = d.routes[0].geometry.coordinates.map((c:number[])=>[c[1],c[0]]);
+            // Grey planned line
+            const pl = L.polyline(geo,{color:'#94A3B8',weight:4,opacity:0.5,dashArray:'10 6'}).addTo(map);
+            pl._custom=true; markersRef.current.push(pl);
+          }
+        }).catch(()=>{
+          // Fallback dashed line
+          const pl = L.polyline(waypoints.map(w=>[w.lat,w.lng]),{color:'#94A3B8',weight:3,dashArray:'8 6',opacity:0.5}).addTo(map);
+          pl._custom=true; markersRef.current.push(pl);
+        });
     }
 
-    // Completed path
-    if(pathPts.current.length>1){
-      doneLine.current=L.polyline(pathPts.current,{color:'#10B981',weight:5,opacity:.9}).addTo(map);
-      doneLine.current._np=true;
+    // Green completed path
+    if (pathCoords.current.length > 1) {
+      if (pathLine.current) map.removeLayer(pathLine.current);
+      pathLine.current = L.polyline(pathCoords.current,{color:'#10B981',weight:5,opacity:.9}).addTo(map);
     }
 
-    // Live vehicle
-    if(livePos){
-      const icon=L.divIcon({html:PIN('🚗','#FF6B35',true),className:'',iconSize:[38,44],iconAnchor:[19,44]});
-      if(vehicleMk.current) vehicleMk.current.setLatLng([livePos.lat,livePos.lng]);
-      else { vehicleMk.current=L.marker([livePos.lat,livePos.lng],{icon,zIndexOffset:1000}).addTo(map); vehicleMk.current._np=true; }
+    // Live vehicle marker
+    if (livePos) {
+      const icon = L.divIcon({
+        html: `<div style="position:relative">
+          <div style="position:absolute;top:-4px;left:-4px;width:44px;height:44px;background:#FF6B35;border-radius:50%;opacity:0.25;animation:ping 1.5s cubic-bezier(0,0,0.2,1) infinite"></div>
+          <div style="width:36px;height:36px;background:#FF6B35;border:3px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 3px 12px rgba(255,107,53,.5)">🚗</div>
+        </div>`,
+        className:'', iconSize:[36,36], iconAnchor:[18,18]
+      });
+      if (vehicleMark.current) map.removeLayer(vehicleMark.current);
+      vehicleMark.current = L.marker([livePos.lat,livePos.lng],{icon,zIndexOffset:1000}).addTo(map)
+        .bindPopup(`<b>🚗 Organiser</b><br/><small>${speed>0?`${speed.toFixed(0)} km/h`:'Stopped'}</small>`);
       bounds.push([livePos.lat,livePos.lng]);
     }
 
-    // Check-in pins — "John is waiting here"
-    checkins.forEach((ci,i)=>{
-      if (!ci.latitude||!ci.longitude) return;
-      const icon_emoji=MEMBER_ICONS[i%MEMBER_ICONS.length];
-      const color=VEHICLE_COLORS[(i+1)%VEHICLE_COLORS.length];
-      const mName = ci.user?.full_name||ci.user?.email?.split('@')[0]||`Member ${i+1}`;
-      const icon=L.divIcon({html:WAITING_PIN(mName,icon_emoji,color),className:'',iconSize:[120,50],iconAnchor:[60,50]});
-      const m=L.marker([+ci.latitude,+ci.longitude],{icon,zIndexOffset:900}).addTo(map)
-        .bindPopup(`<b>${mName}</b><br/>${ci.location_name}`);
-      checkinMks.current[ci.id]=m;
-    });
+    if (bounds.length>1) map.fitBounds(bounds,{padding:[48,48]});
+    else if (bounds.length===1) map.setView(bounds[0],12);
 
-    if(bounds.length>1) map.fitBounds(bounds,{padding:[40,40]});
-    else if(bounds.length===1) map.setView(bounds[0],12);
-  },[waypoints,livePos,mapReady,checkins]);
+    // ETA + progress
+    if (livePos && waypoints.length>0) {
+      const dest = waypoints[waypoints.length-1];
+      const km = haversine(livePos,dest);
+      const min = Math.round(km/40*60);
+      setEta(`~${min} min to ${dest.name.split(',')[0]}`);
+      if (waypoints.length>1) {
+        const start = waypoints[0];
+        const totalKm = haversine(start,dest);
+        const doneKm  = haversine(start,livePos);
+        setProgress(Math.min(99,Math.round((doneKm/totalKm)*100)));
+      }
+    }
+  }, [waypoints, checkins, livePos, mapReady]);
 
-  // GPS tracking
+  useEffect(() => { redraw(); }, [redraw]);
+
+  // GPS tracking (organiser)
   const startTracking = () => {
-    if (!navigator.geolocation) { toast.error('GPS not available'); return; }
+    if (!navigator.geolocation) return toast.error('GPS not available');
     setTracking(true);
-    watchRef.current=navigator.geolocation.watchPosition(async pos=>{
-      const {latitude:lat,longitude:lng,speed:spd}=pos.coords;
-      const kmh=spd?spd*3.6:0;
-      setSpeed(kmh); setLivePos({lat,lng});
-      pathPts.current.push([lat,lng]);
-
-      const now=Date.now();
-      if(now-lastPush.current>15000){
+    toast.success('📡 Live tracking started');
+    watchRef.current = navigator.geolocation.watchPosition(async pos => {
+      const { latitude:lat, longitude:lng, speed:spd } = pos.coords;
+      const kmh = spd ? spd*3.6 : 0;
+      setLivePos({lat,lng,speed:kmh}); setSpeed(kmh);
+      pathCoords.current.push([lat,lng]);
+      const now = Date.now();
+      if (now-lastPush.current>15000) {
         lastPush.current=now;
-        api.post(`/tracking/trips/${tripId}/location`,{latitude:lat,longitude:lng,speed:kmh}).catch(()=>{});
+        await api.post(`/tracking/trips/${tripId}/location`,{latitude:lat,longitude:lng,speed:kmh}).catch(()=>{});
       }
-
-      const dest=waypoints.find(w=>w.type==='end');
-      if(dest){
-        const km=dist({lat,lng},dest);
-        const min=Math.round(km/40*60);
-        setEta(`~${min} min to ${dest.name.split(',')[0]}`);
-        const start=waypoints.find(w=>w.type==='start');
-        if(start){ const total=dist(start,dest); setPct(Math.min(99,Math.round((1-km/total)*100))); }
-      }
-    }, err=>{ toast.error('GPS: '+err.message); setTracking(false); },
-      {enableHighAccuracy:true,maximumAge:5000,timeout:12000});
+    }, err=>{toast.error('GPS: '+err.message);setTracking(false);}, {enableHighAccuracy:true,maximumAge:5000,timeout:12000});
   };
 
-  const stopTracking=()=>{
-    if(watchRef.current!==null) navigator.geolocation.clearWatch(watchRef.current);
-    watchRef.current=null; setTracking(false);
+  const stopTracking = () => {
+    if (watchRef.current!==null) navigator.geolocation.clearWatch(watchRef.current);
+    watchRef.current=null; setTracking(false); toast('📍 Tracking paused');
   };
-  useEffect(()=>()=>{ if(watchRef.current!==null) navigator.geolocation.clearWatch(watchRef.current); },[]);
 
-  // Get current GPS for check-in
-  async function getMyLocation(){
-    setCiGetting(true);
-    return new Promise<void>(resolve=>{
-      navigator.geolocation.getCurrentPosition(async pos=>{
-        const {latitude:lat,longitude:lng}=pos.coords;
-        setCiLat(lat); setCiLng(lng);
-        try {
-          const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,{headers:{'User-Agent':'NamPayanam/1.0'}});
-          const d=await r.json();
-          const name=d.address?.city||d.address?.town||d.address?.village||`${lat.toFixed(4)},${lng.toFixed(4)}`;
-          setCiLoc(name);
-        } catch { setCiLoc(`${lat.toFixed(4)},${lng.toFixed(4)}`); }
-        setCiGetting(false); resolve();
-      }, ()=>{ toast.error('Could not get GPS'); setCiGetting(false); resolve(); }, {timeout:8000});
-    });
-  }
+  useEffect(()=>()=>{if(watchRef.current!==null) navigator.geolocation.clearWatch(watchRef.current);},[]);
 
-  async function submitCheckin(){
-    if (!ciLocation.trim()) { toast.error('Enter your location'); return; }
-    setCiSaving(true);
-    try {
-      await api.post('/checkins',{tripId, locationName:ciLocation, latitude:ciLat, longitude:ciLng, status:'PRESENT'});
-      toast.success('✅ Checked in!');
-      setShowCheckin(false); setCiLoc(''); setCiLat(null); setCiLng(null);
-      await loadData();
-    } catch(e:any){ toast.error(e.response?.data?.error||'Check-in failed'); }
-    finally { setCiSaving(false); }
-  }
-
-  const shareLink=`${window.location.origin}/track/${tripId}`;
+  const shareLink = `${window.location.origin}/join/${tripId}`;
+  const copyLink = () => { navigator.clipboard.writeText(shareLink); setCopied(true); toast.success('Link copied!'); setTimeout(()=>setCopied(false),2000); };
 
   return (
-    <div className="flex flex-col h-screen bg-[var(--bg)] pt-safe">
-      <style>{`@keyframes ping{75%,100%{transform:scale(2);opacity:0}}`}</style>
+    <div className="flex flex-col h-screen bg-[var(--bg)] pt-safe overflow-hidden">
+      <style>{`@keyframes ping{75%,100%{transform:scale(2);opacity:0}}.leaflet-container{z-index:0!important}`}</style>
 
-      <header className="glass z-20 px-4 py-3">
+      {/* Header */}
+      <header className="glass z-20 px-4 py-3 flex-shrink-0">
         <div className="flex items-center gap-3 max-w-2xl mx-auto">
-          <button onClick={()=>navigate(-1)} className="btn-icon bg-[var(--bg)]"><ArrowLeft size={20} className="text-[var(--muted)]"/></button>
-          <h1 className="font-display font-bold text-[var(--text)] flex-1">Live Map</h1>
-          {/* Check-in button for all members */}
-          <button onClick={()=>setShowCheckin(true)}
-            className="btn-ghost py-2 px-3 text-xs border border-[var(--border)] flex items-center gap-1.5">
-            <MapPin size={14} className="text-brand"/> Check In
+          <button onClick={()=>navigate(-1)} className="btn-icon bg-[var(--bg)]">
+            <ArrowLeft size={20} className="text-[var(--muted)]"/>
           </button>
-          <button onClick={()=>{ navigator.clipboard.writeText(shareLink); setCopied(true); setTimeout(()=>setCopied(false),2000); }}
-            className="btn-ghost py-2 px-3 text-xs border border-[var(--border)]">
-            {copied?<><CheckCircle size={14} className="text-emerald-500"/>Copied!</>:<><Copy size={14}/>Share</>}
+          <h1 className="font-display font-bold text-[var(--text)] flex-1">Live Map</h1>
+          <button onClick={copyLink} className="btn-ghost py-2 px-3 text-xs border border-[var(--border)]">
+            {copied ? <Check size={13} className="text-jade"/> : <Copy size={13}/>}
+            {copied ? 'Copied!' : 'Share'}
           </button>
         </div>
       </header>
 
-      {(tracking||livePos)&&(
-        <div className="px-4 py-2 bg-[var(--surface)] border-b border-[var(--border)]">
+      {/* Progress bar — visible when active */}
+      {(tracking||livePos) && (
+        <div className="flex-shrink-0 px-4 py-2 bg-[var(--surface)] border-b border-[var(--border)]">
           <div className="flex justify-between text-xs mb-1">
-            <span className="text-[var(--muted)]">Trip progress</span>
-            <span className="font-bold text-brand">{progressPct}%</span>
+            <span className="text-[var(--muted)] font-medium">Trip Progress</span>
+            <span className="font-bold text-brand">{progress}%</span>
           </div>
-          <div className="progress-track"><div className="progress-fill" style={{width:`${progressPct}%`}}/></div>
+          <div className="progress-track">
+            <div className="progress-fill" style={{width:`${progress}%`}}/>
+          </div>
         </div>
       )}
 
-      {/* Map */}
-      <div className="flex-1 relative">
+      {/* Map — fills remaining space */}
+      <div className="flex-1 relative min-h-0">
         <div ref={mapRef} className="w-full h-full"/>
 
-        {eta&&(
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-[var(--surface)]/95 backdrop-blur-sm rounded-full px-4 py-2 shadow-float flex items-center gap-2 z-10">
-            <Navigation size={14} className="text-brand"/>
+        {/* ETA chip */}
+        {eta && livePos && (
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 bg-[var(--surface)]/95 backdrop-blur-md rounded-full px-4 py-2 shadow-float flex items-center gap-2">
+            <Navigation size={13} className="text-brand"/>
             <span className="text-sm font-bold text-[var(--text)]">{eta}</span>
           </div>
         )}
-        {tracking&&(
-          <div className="absolute bottom-20 left-4 bg-emerald-500 text-white rounded-2xl px-4 py-2.5 shadow-float z-10">
+
+        {/* Speed chip */}
+        {tracking && speed > 0 && (
+          <div className="absolute top-3 right-3 z-10 bg-jade text-white rounded-2xl px-3 py-2 shadow-float text-center">
             <p className="font-display font-black text-xl leading-none">{speed.toFixed(0)}</p>
             <p className="text-white/70 text-[10px]">km/h</p>
           </div>
         )}
 
-        {/* Tracking control */}
-        <div className="absolute bottom-4 right-4 z-10">
-          {isOrg ? (
+        {/* Tracking button (organiser only) */}
+        {isOrg && (
+          <div className="absolute bottom-4 right-4 z-10">
             <button onClick={tracking?stopTracking:startTracking}
-              className={`flex items-center gap-2 font-bold text-sm px-5 py-3 rounded-2xl shadow-float transition-all active:scale-95 ${tracking?'bg-rose-500 text-white':'bg-brand text-white shadow-brand'}`}>
-              {tracking?<><Square size={16} fill="white"/>Stop GPS</>:<><Play size={16} fill="white"/>Go Live</>}
+              className={`flex items-center gap-2 font-bold text-sm px-5 py-3 rounded-2xl shadow-float active:scale-95 transition-all ${tracking?'bg-rose-500 text-white':'btn-primary'}`}>
+              {tracking ? <><Square size={15} fill="white"/>Stop</> : <>🚀 Go Live</>}
             </button>
-          ) : (
-            <div className="bg-[var(--surface)]/90 backdrop-blur-sm rounded-2xl px-3 py-2 text-xs text-[var(--muted)] font-semibold border border-[var(--border)]">
-              👁 Watching organiser
-            </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Legend */}
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-[var(--surface)]/95 backdrop-blur-sm rounded-xl px-3 py-2 shadow-md z-10 flex gap-3">
-          <div className="flex items-center gap-1.5 text-xs text-[var(--muted)] font-semibold"><div className="w-5 h-1.5 bg-emerald-500 rounded"/>Done</div>
-          <div className="flex items-center gap-1.5 text-xs text-[var(--muted)] font-semibold"><div className="w-5 h-0 border-t-2 border-dashed border-slate-400"/>Planned</div>
+        <div className="absolute bottom-4 left-4 z-10 bg-[var(--surface)]/95 backdrop-blur-md rounded-xl px-3 py-2.5 shadow-float space-y-1.5">
+          <div className="flex items-center gap-2 text-[10px] font-semibold text-[var(--muted)]">
+            <div className="w-6 h-1.5 bg-jade rounded"/>Completed
+          </div>
+          <div className="flex items-center gap-2 text-[10px] font-semibold text-[var(--muted)]">
+            <div className="w-6 h-0 border-t-2 border-dashed border-slate-400"/>Planned
+          </div>
         </div>
       </div>
 
       {/* Waypoints strip */}
-      <div className="bg-[var(--surface)] border-t border-[var(--border)] px-4 py-3 max-h-36 overflow-y-auto">
-        <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-          {waypoints.map((w,i)=>(
-            <div key={i} className="flex-shrink-0 flex items-center gap-2 bg-[var(--bg)] rounded-xl px-3 py-2 border border-[var(--border)]">
-              <div className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-xs font-black flex-shrink-0"
-                style={{background:w.type==='start'?'#10B981':w.type==='end'?'#EF4444':'#3B82F6'}}>
-                {i+1}
+      <div className="flex-shrink-0 bg-[var(--surface)] border-t border-[var(--border)] px-4 py-3">
+        <div className="flex gap-2 overflow-x-auto scrollbar-hide max-w-2xl mx-auto">
+          {waypoints.map((w,i) => {
+            const colMap: Record<string,string> = {start:'bg-jade text-white',stop:'bg-sky-500 text-white',end:'bg-brand text-white'};
+            return (
+              <div key={i} className="flex-shrink-0 flex items-center gap-2 bg-[var(--bg)] border border-[var(--border)] rounded-xl px-3 py-2">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black flex-shrink-0 ${colMap[w.type]||'bg-slate-400 text-white'}`}>{i+1}</div>
+                <span className="text-xs font-semibold text-[var(--text)] truncate max-w-[80px]">{w.name?.split(',')[0]}</span>
               </div>
-              <span className="text-xs font-semibold text-[var(--text)] truncate max-w-[80px]">{w.name?.split(',')[0]}</span>
+            );
+          })}
+          {checkins.map(c => (
+            <div key={c.id} className="flex-shrink-0 flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-xl px-3 py-2">
+              <span className="text-base">{CHECKIN_ICONS[c.icon]||'📍'}</span>
+              <span className="text-xs font-semibold text-orange-700 truncate max-w-[80px]">{c.location_name?.split(',')[0]}</span>
             </div>
           ))}
         </div>
       </div>
-
-      {/* Check-in sheet */}
-      {showCheckin&&(
-        <>
-          <div className="sheet-overlay" onClick={()=>setShowCheckin(false)}/>
-          <div className="sheet">
-            <div className="sheet-handle"/>
-            <div className="px-5 py-3 border-b border-[var(--border)] flex items-center justify-between">
-              <h2 className="font-display font-bold text-[var(--text)] text-lg">Check In</h2>
-              <button onClick={()=>setShowCheckin(false)} className="btn-icon bg-[var(--bg)] text-lg text-[var(--muted)]">✕</button>
-            </div>
-            <div className="px-5 py-4 space-y-4 pb-safe">
-              <p className="text-sm text-[var(--muted)]">Let the group know where you are. Your pin will appear on the live map.</p>
-              <div>
-                <label className="label">Your Location</label>
-                <div className="flex gap-2">
-                  <input className="input flex-1" placeholder="e.g. Hotel lobby, Bus stop…"
-                    value={ciLocation} onChange={e=>setCiLoc(e.target.value)}/>
-                  <button type="button" onClick={getMyLocation} disabled={ciGetting}
-                    className="btn-ghost py-2.5 px-3 flex-shrink-0 border border-[var(--border)]">
-                    {ciGetting?<div className="w-4 h-4 border-2 border-[var(--muted)] border-t-brand rounded-full animate-spin"/>:<MapPin size={16}/>}
-                  </button>
-                </div>
-                {ciLat&&<p className="text-xs text-[var(--muted)] mt-1">📍 GPS: {ciLat.toFixed(4)}, {ciLng?.toFixed(4)}</p>}
-              </div>
-              <button onClick={submitCheckin} disabled={ciSaving||!ciLocation.trim()}
-                className="btn-primary w-full py-4">
-                {ciSaving?<><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/>Checking in…</>:<><MapPin size={16}/>Check In Here</>}
-              </button>
-
-              {/* Recent check-ins */}
-              {checkins.length>0&&(
-                <div>
-                  <p className="text-xs font-bold text-[var(--muted)] uppercase mb-2">Group Check-ins</p>
-                  <div className="space-y-2">
-                    {checkins.slice(0,5).map((c,i)=>(
-                      <div key={c.id} className="flex items-center gap-3 bg-[var(--bg)] rounded-xl px-3 py-2.5">
-                        <span className="text-xl">{MEMBER_ICONS[i%MEMBER_ICONS.length]}</span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold text-[var(--text)] truncate">{c.user?.full_name||c.user?.email?.split('@')[0]||'Member'}</p>
-                          <p className="text-xs text-[var(--muted)] flex items-center gap-1"><MapPin size={11}/>{c.location_name}</p>
-                        </div>
-                        <span className="text-[10px] text-[var(--muted)]">{new Date(c.checked_in_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </>
-      )}
     </div>
   );
 }

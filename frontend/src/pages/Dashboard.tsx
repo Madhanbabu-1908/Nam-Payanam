@@ -14,6 +14,7 @@ const MENU = [
   { title:'Members',     icon:Users,        color:'text-amber-600',  bg:'bg-amber-50',    path:'members',   desc:'Travel group' },
   { title:'Live Map',    icon:Navigation,   color:'text-rose-600',   bg:'bg-rose-50',     path:'map',       desc:'GPS tracking' },
   { title:'AI Assist',   icon:Sparkles,     color:'text-violet-600', bg:'bg-violet-50',   path:'ai',        desc:'Smart helper' },
+  { title:'Check In',    icon:MapPin,       color:'text-brand',      bg:'bg-orange-50',   path:'checkin',   desc:'My location' },
 ];
 
 export default function Dashboard() {
