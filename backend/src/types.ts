@@ -20,6 +20,7 @@ export interface Trip {
   destination_lng?: number;
   start_lat?: number;
   start_lng?: number;
+  trip_code?: string;
   
   route?: {
   type: "LineString";
