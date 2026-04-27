@@ -1,7 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { tripService } from '../services/tripService';
-import { aiService } from '../services/aiService'; // ✅ FIXED
+import { aiService } from '../services/aiService';
 import { supabaseAdmin } from '../config/db';
 import { getRealRoute } from '../utils/routeUtils';
 
@@ -31,7 +31,6 @@ export const tripController = {
 
       const userId = req.user.id;
 
-      // 🔥 ROUTE CALCULATION
       let routeCoords: [number, number][] = [];
 
       if (start_lat && start_lng && destination_lat && destination_lng) {
@@ -45,10 +44,8 @@ export const tripController = {
         }
       }
 
-      // 🔐 Trip code
       const tripCode = Math.random().toString(36).substring(2, 8).toUpperCase();
 
-      // ✅ CREATE TRIP
       const newTrip = await tripService.createTrip({
         organizer_id: userId,
         name,
@@ -69,14 +66,13 @@ export const tripController = {
         trip_code: tripCode,
       });
 
-      // ✅ ADD ORGANIZER
       await supabaseAdmin.from('trip_members').insert({
         trip_id: newTrip.id,
         user_id: userId,
         role: 'ORGANIZER'
       });
 
-      // 🤖 AI ITINERARY
+      // 🤖 AI
       if (mode === 'AI' && interests && start_location) {
         try {
           const days =
@@ -104,7 +100,6 @@ export const tripController = {
               await supabaseAdmin.from('itinerary_items').insert(items);
             }
           }
-
         } catch (err: any) {
           console.error("❌ AI failed:", err.message);
         }
@@ -130,9 +125,7 @@ export const tripController = {
 
       const ids = members?.map((m: any) => m.trip_id) || [];
 
-      if (!ids.length) {
-        return res.json({ success: true, data: [] });
-      }
+      if (!ids.length) return res.json({ success: true, data: [] });
 
       const { data: trips } = await supabaseAdmin
         .from('trips')
@@ -147,7 +140,7 @@ export const tripController = {
     }
   },
 
-  // ✅ GET SINGLE TRIP
+  // ✅ GET TRIP
   getTrip: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { tripId } = req.params;
@@ -186,25 +179,96 @@ export const tripController = {
         return res.json({ success: true, message: 'Already joined' });
       }
 
-      const { error } = await supabaseAdmin
-        .from('trip_members')
-        .insert({
-          trip_id: tripId,
-          user_id: userId,
-          role: 'PARTICIPANT'
-        });
-
-      if (error) throw error;
+      await supabaseAdmin.from('trip_members').insert({
+        trip_id: tripId,
+        user_id: userId,
+        role: 'PARTICIPANT'
+      });
 
       res.json({ success: true, message: 'Joined successfully' });
 
     } catch (err: any) {
-      console.error("❌ Join error:", err.message);
       next(err);
     }
   },
 
-  // ✅ GET MEMBERS
+  // ✅ JOIN BY CODE (FIXED)
+  joinByCode: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { code } = req.body;
+      const userId = req.user!.id;
+
+      const { data: trip } = await supabaseAdmin
+        .from('trips')
+        .select('*')
+        .eq('trip_code', code)
+        .single();
+
+      if (!trip) {
+        return res.status(404).json({ success: false, error: 'Invalid code' });
+      }
+
+      await supabaseAdmin.from('trip_members').insert({
+        trip_id: trip.id,
+        user_id: userId,
+        role: 'PARTICIPANT'
+      });
+
+      res.json({ success: true, data: trip });
+
+    } catch (err: any) {
+      next(err);
+    }
+  },
+
+  // ✅ UPDATE TRIP (FIXED)
+  updateTrip: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { tripId } = req.params;
+      const updates = req.body;
+
+      const { data, error } = await supabaseAdmin
+        .from('trips')
+        .update({
+          ...updates,
+          destination_lat: updates.destination_lat ?? undefined,
+          destination_lng: updates.destination_lng ?? undefined,
+          start_lat: updates.start_lat ?? undefined,
+          start_lng: updates.start_lng ?? undefined,
+        })
+        .eq('id', tripId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      res.json({ success: true, data });
+
+    } catch (err: any) {
+      next(err);
+    }
+  },
+
+  // ✅ DELETE TRIP (FIXED)
+  deleteTrip: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { tripId } = req.params;
+
+      const { error } = await supabaseAdmin
+        .from('trips')
+        .delete()
+        .eq('id', tripId);
+
+      if (error) throw error;
+
+      res.json({ success: true, message: 'Trip deleted' });
+
+    } catch (err: any) {
+      next(err);
+    }
+  },
+
+  // ✅ MEMBERS
   getMembers: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { tripId } = req.params;
