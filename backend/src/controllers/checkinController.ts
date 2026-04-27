@@ -1,15 +1,11 @@
 import { Request, Response } from "express";
-import { supabaseAdmin } from '../config/db';
+import { supabaseAdmin } from "../config/db";
 
 export const checkIn = async (req: Request, res: Response) => {
   try {
-    // 🔐 Get user from auth middleware
     const userId = (req as any).user?.id;
-
-    // 📦 Extract request data
     const { tripId, location } = req.body;
 
-    // ❗ Validations
     if (!userId) {
       return res.status(401).json({
         success: false,
@@ -24,8 +20,8 @@ export const checkIn = async (req: Request, res: Response) => {
       });
     }
 
-    // 🧠 Optional: Check if user is part of trip
-    const { data: member, error: memberError } = await supabase
+    // ✅ FIXED HERE
+    const { data: member, error: memberError } = await supabaseAdmin
       .from("trip_members")
       .select("id")
       .eq("trip_id", tripId)
@@ -39,8 +35,8 @@ export const checkIn = async (req: Request, res: Response) => {
       });
     }
 
-    // 📍 Insert check-in
-    const { error } = await supabase.from("checkins").insert({
+    // ✅ FIXED HERE
+    const { error } = await supabaseAdmin.from("checkins").insert({
       trip_id: tripId,
       user_id: userId,
       location,
@@ -51,7 +47,6 @@ export const checkIn = async (req: Request, res: Response) => {
       throw error;
     }
 
-    // ✅ Success
     return res.status(200).json({
       success: true,
       message: "Check-in successful",
