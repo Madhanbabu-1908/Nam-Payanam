@@ -2,106 +2,86 @@ import { motion } from "framer-motion";
 
 interface VehicleLoaderProps {
   message?: string;
+  step?: number; // 0,1,2 for different loading stages
 }
 
-export default function VehicleLoader({ message }: VehicleLoaderProps) {
+export default function VehicleLoader({ message, step = 0 }: VehicleLoaderProps) {
+  const loadingMessages = [
+    "Finding the best route 🗺️",
+    "Checking traffic 🚦",
+    "Almost there ⏳",
+  ];
+  const displayMessage = message || loadingMessages[step] || "Planning your trip...";
+
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#f3f4f6] overflow-hidden">
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-b from-[#eef2ff] to-[#f9fafb] overflow-hidden">
 
-      {/* Plane */}
-      <motion.div
-        animate={{ y: [0, -2, 0] }} // subtle vibration
-        transition={{
-          repeat: Infinity,
-          duration: 1.2,
-          ease: "easeInOut",
-        }}
-        className="relative"
-      >
-        <svg
-          width="220"
-          height="120"
-          viewBox="0 0 220 120"
+      {/* Map-like background (subtle grid) */}
+      <div className="absolute inset-0 opacity-10 pointer-events-none">
+        <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#3b82f6" strokeWidth="0.5" />
+          </pattern>
+          <rect width="100%" height="100%" fill="url(#grid)" />
+        </svg>
+      </div>
+
+      {/* Dashed route line */}
+      <svg width="300" height="200" viewBox="0 0 300 200" className="mb-8">
+        <path
+          d="M30 150 Q80 50 150 80 T270 90"
           fill="none"
-          stroke="#ef4444"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          {/* Plane Body */}
-          <path d="M50 60 L80 40 L150 40 Q165 40 175 50 Q185 60 175 70 Q165 80 150 80 L80 80 L50 60 Z" />
+          stroke="#3b82f6"
+          strokeWidth="3"
+          strokeDasharray="8 8"
+        />
+        {/* Moving car along the path */}
+        <motion.circle
+          r="8"
+          fill="#ef4444"
+          stroke="white"
+          strokeWidth="2"
+          initial={{ offsetDistance: "0%" }}
+          animate={{ offsetDistance: "100%" }}
+          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+          style={{ offsetPath: "path('M30 150 Q80 50 150 80 T270 90')" }}
+        />
+      </svg>
 
-          {/* Wing */}
-          <path d="M100 40 L120 25 L135 40" />
-
-          {/* Tail */}
-          <path d="M50 60 L38 48 L60 52" />
-
-          {/* Bottom fin */}
-          <path d="M75 80 L60 95 L90 85" />
-
-          {/* Speed Lines */}
-          <motion.path
-            d="M20 50 L40 50"
-            strokeOpacity="0.6"
-            animate={{ x: [-10, 0], opacity: [0, 1, 0] }}
-            transition={{ repeat: Infinity, duration: 1 }}
-          />
-          <motion.path
-            d="M10 65 L35 65"
-            strokeOpacity="0.6"
-            animate={{ x: [-10, 0], opacity: [0, 1, 0] }}
-            transition={{ repeat: Infinity, duration: 1.2 }}
-          />
-          <motion.path
-            d="M25 40 L45 40"
-            strokeOpacity="0.4"
-            animate={{ x: [-10, 0], opacity: [0, 1, 0] }}
-            transition={{ repeat: Infinity, duration: 0.8 }}
-          />
+      {/* Destination pin pulse */}
+      <motion.div
+        className="relative mb-6"
+        animate={{ scale: [1, 1.2, 1] }}
+        transition={{ repeat: Infinity, duration: 1.5 }}
+      >
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="#3b82f6" stroke="white" strokeWidth="1">
+          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
         </svg>
       </motion.div>
 
-      {/* Optional Message */}
-      {message && (
-        <p className="mt-6 text-sm text-gray-500 font-medium tracking-wide">
-          {message}
-        </p>
-      )}
-
-      {/* Cloud 1 */}
-      <motion.div
-        className="absolute right-24 top-28"
-        animate={{ x: [0, 8, 0] }}
-        transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
+      {/* Dynamic message with fade in/out */}
+      <motion.p
+        key={displayMessage}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -10 }}
+        transition={{ duration: 0.4 }}
+        className="text-base text-gray-700 font-medium text-center px-4"
       >
-        <svg
-          width="50"
-          height="25"
-          fill="none"
-          stroke="#ef4444"
-          strokeWidth="2.5"
-        >
-          <path d="M10 18 Q15 8 25 12 Q30 5 40 12 Q45 15 40 18 Z" />
-        </svg>
-      </motion.div>
+        {displayMessage}
+      </motion.p>
 
-      {/* Cloud 2 */}
-      <motion.div
-        className="absolute right-40 bottom-24"
-        animate={{ x: [0, -8, 0] }}
-        transition={{ repeat: Infinity, duration: 5, ease: "easeInOut" }}
-      >
-        <svg
-          width="50"
-          height="25"
-          fill="none"
-          stroke="#ef4444"
-          strokeWidth="2.5"
-        >
-          <path d="M10 18 Q15 8 25 12 Q30 5 40 12 Q45 15 40 18 Z" />
-        </svg>
-      </motion.div>
+      {/* Optional small loading dots */}
+      <div className="flex gap-1 mt-4">
+        {[0, 1, 2].map((i) => (
+          <motion.div
+            key={i}
+            className="w-2 h-2 bg-blue-500 rounded-full"
+            animate={{ y: [0, -4, 0] }}
+            transition={{ repeat: Infinity, duration: 0.8, delay: i * 0.2 }}
+          />
+        ))}
+      </div>
     </div>
   );
 }
