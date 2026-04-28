@@ -17,17 +17,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    let isMounted = true;
 
+    const initializeAuth = async () => {
+      // 1. Fetch Session
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (isMounted) {
+        setUser(session?.user ?? null);
+        
+        // 2. Force Minimum Load Time (1.5 seconds)
+        // This ensures the VehicleLoader animation plays through at least once smoothly
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        
+        setLoading(false);
+      }
+    };
+
+    initializeAuth();
+
+    // 3. Listen for Auth Changes (Login/Logout)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
-      setLoading(false);
+      // We don't set loading to false here immediately if we want to show 
+      // a quick loader on login/logout transitions too, but usually immediate is fine.
+      // If you want a loader on login transition, uncomment below:
+      // setLoading(true); 
+      // setTimeout(() => setLoading(false), 800);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
