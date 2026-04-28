@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { ArrowLeft, Plus, X, MapPin, Search, Navigation, Sparkles, PenLine } from 'lucide-react';
-import LoadingScreen from '../components/LoadingScreen';
+import LoadingScreen from '../components/common/VehicleLoader';
 
 declare const L: any;
 
