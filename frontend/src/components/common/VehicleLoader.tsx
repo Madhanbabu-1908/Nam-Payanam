@@ -1,13 +1,21 @@
 import { motion } from "framer-motion";
 
-export default function ExactPlaneLoader() {
-  return (
-    <div className="fixed inset-0 flex items-center justify-center bg-[#f3f4f6]">
+interface VehicleLoaderProps {
+  message?: string;
+}
 
-      {/* Plane Group */}
+export default function VehicleLoader({ message }: VehicleLoaderProps) {
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#f3f4f6] overflow-hidden">
+
+      {/* Plane */}
       <motion.div
         animate={{ y: [0, -2, 0] }} // subtle vibration
-        transition={{ repeat: Infinity, duration: 1.2, ease: "easeInOut" }}
+        transition={{
+          repeat: Infinity,
+          duration: 1.2,
+          ease: "easeInOut",
+        }}
         className="relative"
       >
         <svg
@@ -32,32 +40,34 @@ export default function ExactPlaneLoader() {
           {/* Bottom fin */}
           <path d="M75 80 L60 95 L90 85" />
 
-          {/* Speed Lines (animated) */}
+          {/* Speed Lines */}
           <motion.path
             d="M20 50 L40 50"
             strokeOpacity="0.6"
-            initial={{ x: 0, opacity: 0 }}
             animate={{ x: [-10, 0], opacity: [0, 1, 0] }}
             transition={{ repeat: Infinity, duration: 1 }}
           />
-
           <motion.path
             d="M10 65 L35 65"
             strokeOpacity="0.6"
-            initial={{ x: 0, opacity: 0 }}
             animate={{ x: [-10, 0], opacity: [0, 1, 0] }}
             transition={{ repeat: Infinity, duration: 1.2 }}
           />
-
           <motion.path
             d="M25 40 L45 40"
             strokeOpacity="0.4"
-            initial={{ x: 0, opacity: 0 }}
             animate={{ x: [-10, 0], opacity: [0, 1, 0] }}
             transition={{ repeat: Infinity, duration: 0.8 }}
           />
         </svg>
       </motion.div>
+
+      {/* Optional Message */}
+      {message && (
+        <p className="mt-6 text-sm text-gray-500 font-medium tracking-wide">
+          {message}
+        </p>
+      )}
 
       {/* Cloud 1 */}
       <motion.div
@@ -65,7 +75,13 @@ export default function ExactPlaneLoader() {
         animate={{ x: [0, 8, 0] }}
         transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
       >
-        <svg width="50" height="25" fill="none" stroke="#ef4444" strokeWidth="2.5">
+        <svg
+          width="50"
+          height="25"
+          fill="none"
+          stroke="#ef4444"
+          strokeWidth="2.5"
+        >
           <path d="M10 18 Q15 8 25 12 Q30 5 40 12 Q45 15 40 18 Z" />
         </svg>
       </motion.div>
@@ -76,7 +92,13 @@ export default function ExactPlaneLoader() {
         animate={{ x: [0, -8, 0] }}
         transition={{ repeat: Infinity, duration: 5, ease: "easeInOut" }}
       >
-        <svg width="50" height="25" fill="none" stroke="#ef4444" strokeWidth="2.5">
+        <svg
+          width="50"
+          height="25"
+          fill="none"
+          stroke="#ef4444"
+          strokeWidth="2.5"
+        >
           <path d="M10 18 Q15 8 25 12 Q30 5 40 12 Q45 15 40 18 Z" />
         </svg>
       </motion.div>
