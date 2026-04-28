@@ -10,14 +10,11 @@ interface VehicleLoaderProps {
 
 const AnimatedBike = ({ color }: { color: string }) => (
   <svg width="80" height="60" viewBox="0 0 100 80" fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-    {/* Frame */}
     <path d="M25 40 L45 40 L65 15 L85 40 L25 40" />
     <path d="M45 40 L35 65" />
     <path d="M65 15 L55 25" />
-    {/* Seat & Handle */}
     <path d="M20 35 L30 35" strokeWidth="4" />
     <path d="M75 20 L80 15" />
-    {/* Wheels with Spin Animation */}
     <g className="origin-center animate-[spin_3s_linear_infinite]" style={{ transformOrigin: '25px 65px' }}>
       <circle cx="25" cy="65" r="12" strokeWidth="2.5" />
       <path d="M25 53 L25 77 M13 65 L37 65" strokeWidth="1.5" opacity="0.5" />
@@ -31,11 +28,8 @@ const AnimatedBike = ({ color }: { color: string }) => (
 
 const AnimatedCar = ({ color }: { color: string }) => (
   <svg width="90" height="50" viewBox="0 0 100 60" fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-    {/* Body */}
     <path d="M10 35 Q10 25 20 25 L35 25 L45 15 L75 15 L85 25 L90 25 Q95 25 95 35 L95 45 L10 45 Z" />
-    {/* Windows */}
     <path d="M38 25 L48 18 L72 18 L82 25" strokeWidth="2" opacity="0.6" />
-    {/* Wheels with Spin */}
     <g className="origin-center animate-[spin_2s_linear_infinite]" style={{ transformOrigin: '25px 45px' }}>
       <circle cx="25" cy="45" r="10" strokeWidth="2.5" />
       <circle cx="25" cy="45" r="4" strokeWidth="1.5" opacity="0.5" />
@@ -47,17 +41,13 @@ const AnimatedCar = ({ color }: { color: string }) => (
   </svg>
 );
 
-const AnimatedBus = ({ color }: { color: string }) => (  <svg width="90" height="60" viewBox="0 0 100 70" fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-    {/* Body */}
+const AnimatedBus = ({ color }: { color: string }) => (
+  <svg width="90" height="60" viewBox="0 0 100 70" fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
     <rect x="10" y="15" width="80" height="45" rx="8" />
-    {/* Windows */}
     <path d="M20 25 H80" strokeWidth="2" opacity="0.6" />
     <path d="M50 25 V60" strokeWidth="2" opacity="0.6" />
-    {/* Door */}
     <path d="M15 35 V55" strokeWidth="2" opacity="0.6" />
-    {/* Wheels */}
-    <g className="origin-center animate-[spin_2.5s_linear_infinite]" style={{ transformOrigin: '25px 60px' }}>
-      <circle cx="25" cy="60" r="8" strokeWidth="2.5" />
+    <g className="origin-center animate-[spin_2.5s_linear_infinite]" style={{ transformOrigin: '25px 60px' }}>      <circle cx="25" cy="60" r="8" strokeWidth="2.5" />
     </g>
     <g className="origin-center animate-[spin_2.5s_linear_infinite]" style={{ transformOrigin: '75px 60px' }}>
       <circle cx="75" cy="60" r="8" strokeWidth="2.5" />
@@ -67,14 +57,10 @@ const AnimatedBus = ({ color }: { color: string }) => (  <svg width="90" height=
 
 const AnimatedTrain = ({ color }: { color: string }) => (
   <svg width="90" height="50" viewBox="0 0 100 60" fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-    {/* Body */}
     <path d="M15 45 L15 20 Q15 10 25 10 L75 10 Q85 10 85 20 L85 45" />
     <path d="M10 45 H90" strokeWidth="4" />
-    {/* Window */}
     <rect x="30" y="20" width="40" height="15" rx="2" strokeWidth="2" opacity="0.6" />
-    {/* Connector */}
     <path d="M5 35 H10" strokeWidth="2" />
-    {/* Wheels */}
     <g className="origin-center animate-[spin_1.5s_linear_infinite]" style={{ transformOrigin: '30px 45px' }}>
       <circle cx="30" cy="45" r="6" strokeWidth="2.5" />
       <path d="M30 39 L30 51 M24 45 L36 45" strokeWidth="1" />
@@ -88,18 +74,14 @@ const AnimatedTrain = ({ color }: { color: string }) => (
 
 const AnimatedPlane = ({ color }: { color: string }) => (
   <svg width="90" height="60" viewBox="0 0 100 70" fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-    {/* Fuselage */}
     <path d="M10 35 Q30 10 60 10 Q85 10 90 35 Q85 60 60 60 Q30 60 10 35 Z" />
-    {/* Wing */}
     <path d="M45 35 L45 15 Q60 15 65 35" fill="rgba(255,255,255,0.1)" />
-    {/* Tail */}
     <path d="M20 35 L15 20 L30 25" />
-    {/* Propeller / Jet Effect */}
     <g className="origin-center animate-[spin_0.5s_linear_infinite]" style={{ transformOrigin: '88px 35px' }}>
-      <path d="M85 35 H95" strokeWidth="2" opacity="0.8" />      <path d="M85 35 H95" strokeWidth="2" opacity="0.8" transform="rotate(60 88 35)" />
+      <path d="M85 35 H95" strokeWidth="2" opacity="0.8" />
+      <path d="M85 35 H95" strokeWidth="2" opacity="0.8" transform="rotate(60 88 35)" />
       <path d="M85 35 H95" strokeWidth="2" opacity="0.8" transform="rotate(120 88 35)" />
     </g>
-    {/* Speed Lines */}
     <path d="M5 25 H2" strokeWidth="2" opacity="0.5" className="animate-pulse" />
     <path d="M5 45 H2" strokeWidth="2" opacity="0.5" className="animate-pulse" style={{ animationDelay: '0.2s' }} />
   </svg>
@@ -114,8 +96,7 @@ export default function VehicleLoader({ message }: VehicleLoaderProps) {
 
   const statusMessages = useMemo(() => [
     "Warming up engine...",
-    "Calibrating GPS satellites...",
-    "Syncing weather data...",
+    "Calibrating GPS satellites...",    "Syncing weather data...",
     "Optimizing route geometry...",
     "Checking traffic conditions...",
     "Finalizing itinerary...",
@@ -145,7 +126,8 @@ export default function VehicleLoader({ message }: VehicleLoaderProps) {
     }, 50);
 
     const statusInterval = setInterval(() => {
-      if (!message) {        setStatusText((prev) => {
+      if (!message) {
+        setStatusText((prev) => {
           const currentIndex = statusMessages.indexOf(prev);
           return statusMessages[(currentIndex + 1) % statusMessages.length];
         });
@@ -163,9 +145,11 @@ export default function VehicleLoader({ message }: VehicleLoaderProps) {
 
   const displayMessage = message || statusText;
   const isFinished = progress >= 100;
-
   const idleVibration = { y: [0, -1, 0] };
   const revVibration = { y: [0, -2, 0, -1, 0] };
+
+  // Define the grid pattern URL safely outside JSX to avoid parsing errors
+  const gridPatternUrl = `url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 3h1v1H1V3zm2 1h1v1H3V4z' fill='%23fff' fill-opacity='0.1'/%3E%3C/svg%3E")`;
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950 overflow-hidden">
@@ -194,7 +178,8 @@ export default function VehicleLoader({ message }: VehicleLoaderProps) {
               x: ['0vw', '100vw'],
               opacity: [0, 1, 0],
             }}
-            transition={{              duration: Math.random() * 1 + 0.5,
+            transition={{
+              duration: Math.random() * 1 + 0.5,
               repeat: Infinity,
               delay: Math.random() * 2,
               ease: "linear",
@@ -209,8 +194,7 @@ export default function VehicleLoader({ message }: VehicleLoaderProps) {
         {/* Vehicle Card */}
         <div className="relative mb-10">
           <motion.div
-            animate={{
-              scale: isFinished ? [1, 1.5, 2] : [1, 1.1, 1],
+            animate={{              scale: isFinished ? [1, 1.5, 2] : [1, 1.1, 1],
               opacity: isFinished ? [0.5, 0] : [0.3, 0.6, 0.3],
             }}
             transition={{ 
@@ -243,7 +227,8 @@ export default function VehicleLoader({ message }: VehicleLoaderProps) {
             </motion.div>
 
             <div className="absolute -top-2 -right-2 bg-slate-900 border border-white/20 rounded-full p-1.5 shadow-lg">
-              {vehicleIndex === 4 ? <Zap size={16} className="text-yellow-400" /> : <Wind size={16} className="text-slate-400" />}            </div>
+              {vehicleIndex === 4 ? <Zap size={16} className="text-yellow-400" /> : <Wind size={16} className="text-slate-400" />}
+            </div>
           </motion.div>
         </div>
 
@@ -258,8 +243,7 @@ export default function VehicleLoader({ message }: VehicleLoaderProps) {
           </motion.h1>
 
           <AnimatePresence mode="wait">
-            <motion.p
-              key={displayMessage}
+            <motion.p              key={displayMessage}
               initial={{ opacity: 0, y: 5, filter: "blur(4px)" }}
               animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
               exit={{ opacity: 0, y: -5, filter: "blur(4px)" }}
@@ -292,7 +276,13 @@ export default function VehicleLoader({ message }: VehicleLoaderProps) {
               transition={{ ease: "circOut" }}
             >
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent w-full -translate-x-full animate-shimmer" />
-            </motion.div>            <div className="absolute inset-0 bg-[url('image/svg+xml;base64,PHN2ZyB3aWR0aD0iNCIgaGVpZ2h0PSI0IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxwYXRoIGQ9Ik0xIDNoMXYxSDFWM3ptMiAxaDF2MUgzVjR6IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMSIvPjwvc3ZnPg==')] opacity="30" />
+            </motion.div>
+            
+            {/* Fixed: Using style prop for background image to avoid Tailwind parsing error */}
+            <div 
+              className="absolute inset-0 opacity-30"
+              style={{ backgroundImage: gridPatternUrl }}
+            />
           </div>
         </div>
 
@@ -302,8 +292,7 @@ export default function VehicleLoader({ message }: VehicleLoaderProps) {
         @keyframes shimmer {
           100% { transform: translateX(100%); }
         }
-        .animate-shimmer {
-          animation: shimmer 1.5s infinite;
+        .animate-shimmer {          animation: shimmer 1.5s infinite;
         }
       `}</style>
     </div>
