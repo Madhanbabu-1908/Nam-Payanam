@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate, useParams, useNavigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
+
+// Pages
 import Login           from './pages/Login';
 import Register        from './pages/Register';
 import Home            from './pages/Home';
@@ -15,11 +17,16 @@ import AIPage          from './pages/AIPage';
 import ProfilePage     from './pages/ProfilePage';
 import CheckinPage     from './pages/CheckinPage';
 import JoinPage        from './pages/JoinPage';
-import LoadingScreen   from './components/LoadingScreen';
+
+// ✅ IMPORT THE NEW LOADER
+import VehicleLoader   from './components/common/VehicleLoader'; 
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-  if (loading) return <LoadingScreen/>;
+  
+  // ✅ SHOW VEHICLE LOADER WHILE AUTH CHECKS HAPPEN
+  if (loading) return <VehicleLoader />;
+  
   return user ? <>{children}</> : <Navigate to="/login" replace/>;
 }
 
