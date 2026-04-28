@@ -63,6 +63,10 @@ export default function VehicleLoader({ message }: VehicleLoaderProps) {
   const displayMessage = message || statusText;
   const isFinished = progress >= 100;
 
+  // Define vibration variants separately to avoid object literal conflicts
+  const idleVibration = { y: [0, -1, 0] };
+  const revVibration = { y: [0, -2, 0, -1, 0] };
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950 overflow-hidden">
       
@@ -92,11 +96,11 @@ export default function VehicleLoader({ message }: VehicleLoaderProps) {
             }}
             transition={{
               duration: Math.random() * 1 + 0.5,
-              repeat: Infinity,
-              delay: Math.random() * 2,
+              repeat: Infinity,              delay: Math.random() * 2,
               ease: "linear",
             }}
-          />        ))}
+          />
+        ))}
       </div>
 
       {/* --- Main Content --- */}
@@ -124,14 +128,12 @@ export default function VehicleLoader({ message }: VehicleLoaderProps) {
               y: 0, 
               opacity: 1, 
               rotateX: 0,
-              y: isFinished ? [0, -2, 0, -1, 0] : [0, -1, 0],
             }}
             exit={{ y: -50, opacity: 0, scale: 0.5 }}
             transition={{ 
               type: "spring", 
               stiffness: 200, 
-              damping: 20,
-              y: isFinished ? { repeat: Infinity, duration: 0.1 } : { repeat: Infinity, duration: 2 }
+              damping: 20 
             }}
             className={`relative w-32 h-32 rounded-3xl flex items-center justify-center backdrop-blur-md border border-white/10 shadow-2xl ${currentVehicle.shadow}`}
             style={{
@@ -139,12 +141,23 @@ export default function VehicleLoader({ message }: VehicleLoaderProps) {
               boxShadow: `0 20px 40px -10px ${currentVehicle.color}60`
             }}
           >
-            <currentVehicle.Icon 
-              size={64} 
-              strokeWidth={1.5}
-              style={{ color: currentVehicle.color }}
-              className="drop-shadow-lg"
-            />
+            {/* Inner Animation for Vibration (Separated to fix TS error) */}
+            <motion.div
+              animate={isFinished ? revVibration : idleVibration}
+              transition={{ 
+                repeat: Infinity,                 duration: isFinished ? 0.1 : 2,
+                ease: "easeInOut"
+              }}
+              className="flex items-center justify-center w-full h-full"
+            >
+              <currentVehicle.Icon 
+                size={64} 
+                strokeWidth={1.5}
+                style={{ color: currentVehicle.color }}
+                className="drop-shadow-lg"
+              />
+            </motion.div>
+
             <div className="absolute -top-2 -right-2 bg-slate-900 border border-white/20 rounded-full p-1.5 shadow-lg">
               {vehicleIndex === 4 ? <Zap size={16} className="text-yellow-400" /> : <Wind size={16} className="text-slate-400" />}
             </div>
@@ -181,8 +194,7 @@ export default function VehicleLoader({ message }: VehicleLoaderProps) {
         </div>
 
         {/* Progress Bar */}
-        <div className="w-full mt-8 relative group">
-          <div className="flex justify-between text-xs font-mono text-slate-500 mb-2 uppercase tracking-wider">
+        <div className="w-full mt-8 relative group">          <div className="flex justify-between text-xs font-mono text-slate-500 mb-2 uppercase tracking-wider">
             <span>System Status</span>
             <span>{Math.round(progress)}%</span>
           </div>
@@ -194,15 +206,15 @@ export default function VehicleLoader({ message }: VehicleLoaderProps) {
               initial={{ width: 0 }}
               animate={{ width: `${progress}%` }}
               transition={{ ease: "circOut" }}
-            >              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent w-full -translate-x-full animate-shimmer" />
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent w-full -translate-x-full animate-shimmer" />
             </motion.div>
-            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNCIgaGVpZ2h0PSI0IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxwYXRoIGQ9Ik0xIDNoMXYxSDFWM3ptMiAxaDF2MUgzVjR6IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMSIvPjwvc3ZnPg==')] opacity-30" />
+            <div className="absolute inset-0 bg-[url('image/svg+xml;base64,PHN2ZyB3aWR0aD0iNCIgaGVpZ2h0PSI0IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxwYXRoIGQ9Ik0xIDNoMXYxSDFWM3ptMiAxaDF2MUgzVjR6IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMSIvPjwvc3ZnPg==')] opacity-30" />
           </div>
         </div>
 
       </div>
 
-      {/* Inject Custom Keyframes safely via style tag in JSX */}
       <style>{`
         @keyframes shimmer {
           100% { transform: translateX(100%); }
