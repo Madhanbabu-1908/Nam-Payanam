@@ -1,8 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Bike, Car, Bus, Train, Plane, MapPin } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
-export default function VehicleLoader() {
+// ✅ Add message to props interface
+interface VehicleLoaderProps {
+  message?: string;
+}
+
+export default function VehicleLoader({ message }: VehicleLoaderProps) {
   const [vehicleIndex, setVehicleIndex] = useState(0);
   const [progress, setProgress] = useState(0);
 
@@ -15,16 +20,14 @@ export default function VehicleLoader() {
   ];
 
   useEffect(() => {
-    // Cycle through vehicles
     const vehicleInterval = setInterval(() => {
       setVehicleIndex((prev) => (prev + 1) % vehicles.length);
     }, 1200);
 
-    // Simulate loading progress
     const progressInterval = setInterval(() => {
       setProgress((prev) => {
-        if (prev >= 100) return 0; // Reset loop
-        return prev + 2; 
+        if (prev >= 100) return 0;
+        return prev + 2;
       });
     }, 50);
 
@@ -37,26 +40,28 @@ export default function VehicleLoader() {
   const CurrentVehicle = vehicles[vehicleIndex].Icon;
   const currentData = vehicles[vehicleIndex];
 
+  // Use custom message if provided, otherwise default
+  const displayMessage = message || `Preparing your ${currentData.name} journey...`;
+
   return (
     <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 transition-colors duration-700 overflow-hidden relative">
       
       {/* Background Decorative Blobs */}
-      <motion.div 
-        animate={{ scale: [1, 1.2, 1], rotate: [0, 90, 0] }}
+      <motion.div         animate={{ scale: [1, 1.2, 1], rotate: [0, 90, 0] }}
         transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
         className={`absolute top-[-10%] left-[-10%] w-96 h-96 bg-gradient-to-r ${currentData.bg} rounded-full blur-3xl opacity-30 dark:opacity-10`}
       />
       <motion.div 
-        animate={{ scale: [1, 1.3, 1], rotate: [0, -90, 0] }}        transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
+        animate={{ scale: [1, 1.3, 1], rotate: [0, -90, 0] }}
+        transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
         className={`absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-gradient-to-l ${currentData.bg} rounded-full blur-3xl opacity-30 dark:opacity-10`}
       />
 
       {/* Main Content Container */}
-      <div className="relative z-10 flex flex-col items-center">
+      <div className="relative z-10 flex flex-col items-center px-4">
         
         {/* Animated Icon Card */}
         <div className="relative mb-8">
-          {/* Glow Effect behind icon */}
           <motion.div 
             initial={{ opacity: 0.5, scale: 0.8 }}
             animate={{ opacity: [0.5, 0.8, 0.5], scale: [0.8, 1.1, 0.8] }}
@@ -64,9 +69,8 @@ export default function VehicleLoader() {
             className={`absolute inset-0 rounded-full blur-xl bg-gradient-to-tr ${currentData.bg}`}
           />
 
-          {/* The Icon Box */}
           <motion.div
-            key={vehicleIndex} // Triggers animation on change
+            key={vehicleIndex}
             initial={{ y: 20, opacity: 0, rotate: -10 }}
             animate={{ y: 0, opacity: 1, rotate: 0 }}
             exit={{ y: -20, opacity: 0, rotate: 10 }}
@@ -75,7 +79,6 @@ export default function VehicleLoader() {
           >
             <CurrentVehicle size={64} className={`${currentData.color} drop-shadow-sm`} strokeWidth={1.5} />
             
-            {/* Small badge indicating mode */}
             <div className="absolute -top-3 -right-3 bg-white dark:bg-slate-700 rounded-full p-1.5 shadow-lg border border-slate-100 dark:border-slate-600">
               <MapPin size={16} className="text-slate-400" />
             </div>
@@ -83,30 +86,28 @@ export default function VehicleLoader() {
         </div>
 
         {/* Text Section */}
-        <div className="text-center space-y-2">
+        <div className="text-center space-y-2 max-w-xs">
           <motion.h2 
-            key={vehicleIndex}
+            key="title"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
             className="text-3xl font-bold text-slate-800 dark:text-white tracking-tight"
           >
             Nam Payanam
           </motion.h2>
           
-          <motion.p 
-            key={vehicleIndex + "status"}
-            initial={{ opacity: 0 }}            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+          <motion.p             key={displayMessage} // Re-animate when message changes
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             transition={{ duration: 0.3 }}
-            className="text-slate-500 dark:text-slate-400 font-medium flex items-center justify-center gap-2"
+            className="text-slate-500 dark:text-slate-400 font-medium flex items-center justify-center gap-2 text-sm"
           >
             <span className={`w-2 h-2 rounded-full ${currentData.color.replace('text-', 'bg-')} animate-pulse`} />
-            Preparing your <span className={`font-bold ${currentData.color}`}>{currentData.name}</span> journey...
+            {displayMessage}
           </motion.p>
         </div>
 
-        {/* Professional Progress Bar (Road Style) */}
+        {/* Progress Bar */}
         <div className="mt-10 w-64 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden relative">
           <motion.div 
             className={`h-full bg-gradient-to-r ${currentData.bg.replace('from-', 'from-').replace('to-', 'to-')}`}
@@ -114,7 +115,6 @@ export default function VehicleLoader() {
             animate={{ width: `${progress}%` }}
             transition={{ ease: "linear" }}
           />
-          {/* Moving stripes effect on the bar */}
           <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNCIgaGVpZ2h0PSI0IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxwYXRoIGQ9Ik0xIDNoMXYxSDFWM3ptMiAxaDF2MUgzVjR6IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMiIvPjwvc3ZnPg==')] opacity-30 animate-[spin_1s_linear_infinite]" style={{ backgroundSize: '4px 4px' }}></div>
         </div>
         
