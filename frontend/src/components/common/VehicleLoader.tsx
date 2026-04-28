@@ -1,10 +1,10 @@
-import { motion, AnimatePresence, useSpring, useTransform } from "framer-motion";
+import { motion, AnimatePresence, useSpring, useTransform, useMotionValue, animate } from "framer-motion";
 import { useEffect, useState } from "react";
 
 interface VehicleLoaderProps {
   message?: string;
   onComplete?: () => void;
-  speed?: number; // 1 = normal, >1 faster
+  speed?: number;
 }
 
 type Vehicle = "bike" | "car" | "bus" | "train" | "flight" | "hotel";
@@ -14,370 +14,303 @@ export default function VehicleLoader({ message, onComplete, speed = 1 }: Vehicl
   const [progress, setProgress] = useState(0);
   const [isAnimating, setIsAnimating] = useState(true);
   const [showConfetti, setShowConfetti] = useState(false);
+  const animationProgress = useMotionValue(0);
 
   const vehicleOrder: Vehicle[] = ["bike", "car", "bus", "train", "flight", "hotel"];
   const durations: Record<Vehicle, number> = {
-    bike: 2800,
-    car: 2800,
-    bus: 3200,
-    train: 3600,
-    flight: 4200,
-    hotel: 2200,
+    bike: 3000,
+    car: 3000,
+    bus: 3500,
+    train: 4000,
+    flight: 4500,
+    hotel: 2500,
   };
 
-  // Auto-advance to next vehicle
   useEffect(() => {
     if (!isAnimating) return;
     const currentIndex = vehicleOrder.indexOf(currentVehicle);
     const duration = durations[currentVehicle] / speed;
+    
+    const progressAnimation = animate(0, 1, {
+      duration: duration / 1000,
+      ease: "linear",
+      onUpdate: (value) => {
+        animationProgress.set(value);
+        const overall = ((currentIndex + value) / vehicleOrder.length) * 100;
+        setProgress(Math.min(99, overall));
+      },
+    });
+
     const timer = setTimeout(() => {
+      progressAnimation.stop();
       if (currentIndex + 1 < vehicleOrder.length) {
         setCurrentVehicle(vehicleOrder[currentIndex + 1]);
-        setProgress(((currentIndex + 2) / vehicleOrder.length) * 100);
+        animationProgress.set(0);
       } else {
         setIsAnimating(false);
-        if (onComplete) {
-          // Show confetti before completing
-          setShowConfetti(true);
-          setTimeout(() => onComplete(), 800);
-        }
+        setProgress(100);
+        setShowConfetti(true);
+        setTimeout(() => onComplete?.(), 1000);
       }
     }, duration);
-    return () => clearTimeout(timer);
-  }, [currentVehicle, isAnimating, speed, onComplete]);
 
-  // Spring progress for bar
-  const springProgress = useSpring(progress, { stiffness: 100, damping: 20 });
+    return () => {
+      clearTimeout(timer);
+      progressAnimation.stop();
+    };
+  }, [currentVehicle, isAnimating, speed, onComplete, animationProgress]);
+
+  const springProgress = useSpring(progress, { stiffness: 120, damping: 20 });
   const width = useTransform(springProgress, (v) => `${v}%`);
 
   const getDefaultMessage = () => {
     switch (currentVehicle) {
-      case "bike": return "Finding bike routes 🚲";
-      case "car": return "Checking car traffic 🚗";
-      case "bus": return "Optimizing bus schedule 🚌";
-      case "train": return "Booking train seats 🚆";
-      case "flight": return "Searching flights ✈️";
-      case "hotel": return "Preparing hotels 🏨";
+      case "bike": return "Sketching bike routes";
+      case "car": return "Drawing car traffic";
+      case "bus": return "Illustrating bus schedule";
+      case "train": return "Doodling train seats";
+      case "flight": return "Sketching flight paths";
+      case "hotel": return "Watercolouring hotels";
       default: return "Planning your trip";
     }
   };
   const displayMessage = message || getDefaultMessage();
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 overflow-hidden">
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#faf8f2] overflow-hidden">
       
-      {/* Animated background elements */}
-      <div className="absolute inset-0 opacity-20 pointer-events-none">
-        <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
-              <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#60a5fa" strokeWidth="0.5" strokeDasharray="2 3"/>
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#grid)" />
-        </svg>
-      </div>
+      {/* Paper texture background */}
+      <div className="absolute inset-0 opacity-30 pointer-events-none"
+        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.05'/%3E%3C/svg%3E")` }}
+      />
 
-      {/* Parallax clouds */}
-      <motion.div
-        className="absolute top-12 left-10 text-white/10 text-6xl"
-        animate={{ x: [0, 30, 0], y: [0, -10, 0] }}
-        transition={{ repeat: Infinity, duration: 12, ease: "easeInOut" }}
-      >
-        ☁️
-      </motion.div>
-      <motion.div
-        className="absolute bottom-20 right-8 text-white/10 text-5xl"
-        animate={{ x: [0, -40, 0], y: [0, 15, 0] }}
-        transition={{ repeat: Infinity, duration: 15, ease: "easeInOut", delay: 2 }}
-      >
-        ☁️
-      </motion.div>
+      {/* Hand‑drawn border / frame */}
+      <div className="absolute inset-4 border-2 border-black/10 rounded-2xl pointer-events-none" />
 
-      {/* Confetti overlay for final step */}
-      {showConfetti && (
-        <div className="absolute inset-0 pointer-events-none z-20">
-          {[...Array(50)].map((_, i) => (
-            <motion.div
-              key={i}
-              className="absolute w-2 h-2 rounded-full"
-              style={{
-                background: `hsl(${Math.random() * 360}, 70%, 60%)`,
-                left: `${Math.random() * 100}%`,
-                top: "50%",
-              }}
-              animate={{
-                y: [0, -200, -400],
-                x: [0, (Math.random() - 0.5) * 200],
-                rotate: [0, Math.random() * 360],
-                opacity: [1, 1, 0],
-              }}
-              transition={{ duration: 1.5, ease: "easeOut" }}
-            />
-          ))}
-        </div>
-      )}
+      {/* Sketchy floating lines (like margin doodles) */}
+      <svg className="absolute inset-0 w-full h-full pointer-events-none">
+        <path d="M20 85 Q35 70 50 85 T80 85" stroke="black" strokeWidth="0.8" fill="none" strokeDasharray="3 3" opacity="0.2" />
+        <path d="M300 150 Q320 130 340 150 T380 150" stroke="black" strokeWidth="0.8" fill="none" strokeDasharray="2 4" opacity="0.2" />
+      </svg>
 
-      {/* Vehicle container */}
-      <div className="relative w-full max-w-lg h-72 flex items-center justify-center">
+      {/* Vehicle animation container */}
+      <div className="relative w-full max-w-lg h-80 flex items-center justify-center">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentVehicle}
-            initial={{ opacity: 0, y: 30, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -30, scale: 0.9 }}
-            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+            initial={{ opacity: 0, y: 20, filter: "blur(4px)" }}
+            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+            exit={{ opacity: 0, y: -20, filter: "blur(4px)" }}
+            transition={{ duration: 0.5, ease: "easeInOut" }}
             className="absolute"
           >
-            {currentVehicle === "bike" && <BikeAnimation />}
-            {currentVehicle === "car" && <CarAnimation />}
-            {currentVehicle === "bus" && <BusAnimation />}
-            {currentVehicle === "train" && <TrainAnimation />}
-            {currentVehicle === "flight" && <FlightAnimation />}
-            {currentVehicle === "hotel" && <HotelAnimation />}
+            {currentVehicle === "bike" && <SketchBike progress={animationProgress} />}
+            {currentVehicle === "car" && <SketchCar progress={animationProgress} />}
+            {currentVehicle === "bus" && <SketchBus progress={animationProgress} />}
+            {currentVehicle === "train" && <SketchTrain progress={animationProgress} />}
+            {currentVehicle === "flight" && <SketchFlight progress={animationProgress} />}
+            {currentVehicle === "hotel" && <SketchHotel progress={animationProgress} />}
           </motion.div>
         </AnimatePresence>
       </div>
 
-      {/* Message & progress */}
+      {/* Message & progress (hand‑written font feel) */}
       <div className="mt-6 text-center z-10">
-        <motion.p
+        <motion.div
           key={displayMessage}
           initial={{ opacity: 0, y: 5 }}
-          animate={{ opacity: 0.9, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className="text-white/90 text-base tracking-wide mb-2 font-medium"
+          animate={{ opacity: 1, y: 0 }}
+          className="text-stone-700 text-base font-serif italic tracking-wide mb-2"
         >
           {displayMessage}
-        </motion.p>
-        <div className="text-5xl font-light text-white tabular-nums tracking-tight">
+        </motion.div>
+        <div className="text-5xl font-light text-stone-800 tabular-nums tracking-tight font-mono">
           {Math.floor(springProgress.get())}%
         </div>
-        <div className="w-80 h-1.5 bg-white/10 rounded-full mt-4 overflow-hidden backdrop-blur-sm">
+        <div className="w-80 h-1 bg-stone-300 rounded-full mt-4 overflow-hidden">
           <motion.div
-            className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full"
+            className="h-full bg-stone-600 rounded-full"
             style={{ width }}
           />
         </div>
+        <p className="text-stone-400 text-xs mt-3 font-serif">— handcrafted for you —</p>
       </div>
+
+      {/* Confetti (sketchy dots) */}
+      {showConfetti &&
+        [...Array(60)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute w-2 h-2 rounded-full"
+            style={{
+              background: `hsl(${Math.random() * 360}, 70%, 70%)`,
+              left: `${Math.random() * 100}%`,
+              top: "50%",
+            }}
+            animate={{
+              y: [0, -300, -600],
+              x: [0, (Math.random() - 0.5) * 300],
+              rotate: [0, Math.random() * 720],
+              opacity: [1, 1, 0],
+            }}
+            transition={{ duration: 1.5, ease: "easeOut" }}
+          />
+        ))}
     </div>
   );
 }
 
-// --- Enhanced Bike with realistic dust particles ---
-const BikeAnimation = () => {
-  return (
-    <div className="relative">
-      <motion.div
-        className="flex items-center gap-2"
-        initial={{ x: -200 }}
-        animate={{ x: 200 }}
-        transition={{ duration: 2.4, ease: [0.25, 0.1, 0.25, 1] }}
-      >
-        <svg width="90" height="70" viewBox="0 0 90 70" fill="none">
-          <path d="M20 45 L32 25 L48 25 L60 45" stroke="#ef4444" strokeWidth="3" fill="none" strokeLinecap="round"/>
-          <circle cx="22" cy="52" r="9" stroke="#ef4444" strokeWidth="3" fill="none"/>
-          <circle cx="55" cy="52" r="9" stroke="#ef4444" strokeWidth="3" fill="none"/>
-          <line x1="32" y1="25" x2="40" y2="40" stroke="#ef4444" strokeWidth="2.5"/>
-          <line x1="48" y1="25" x2="44" y2="40" stroke="#ef4444" strokeWidth="2.5"/>
-          <circle cx="22" cy="52" r="3" fill="#fca5a5" />
-          <circle cx="55" cy="52" r="3" fill="#fca5a5" />
-        </svg>
-        {/* Enhanced dust cloud */}
-        <motion.div
-          className="absolute -left-6 bottom-2"
-          animate={{
-            x: [-15, -45],
-            y: [0, -5, 0],
-            opacity: [0.8, 0],
-          }}
-          transition={{ repeat: Infinity, duration: 0.4, ease: "easeOut" }}
-        >
-          {[...Array(5)].map((_, i) => (
-            <motion.div
-              key={i}
-              className="absolute w-1.5 h-1.5 bg-gray-400 rounded-full blur-[0.5px]"
-              style={{ left: i * 2, top: i * 1.5 }}
-              animate={{ scale: [1, 0.5], opacity: [0.6, 0] }}
-              transition={{ repeat: Infinity, duration: 0.3, delay: i * 0.05 }}
-            />
-          ))}
-        </motion.div>
-      </motion.div>
-    </div>
-  );
-};
+// ---- SKETCH STYLE VEHICLES ----
+// Each uses multiple thin, irregular strokes, rough edges, and a monochrome palette
 
-// --- Car with smooth slide and subtle suspension wobble ---
-const CarAnimation = () => {
+const SketchBike = ({ progress }: { progress: any }) => {
+  const x = useTransform(progress, [0, 1], [-180, 180]);
   return (
-    <motion.div
-      initial={{ x: -220 }}
-      animate={{ x: 220 }}
-      transition={{ duration: 2.4, ease: [0.25, 0.1, 0.25, 1] }}
-    >
-      <motion.div
-        animate={{ y: [0, -2, 0, 2, 0] }}
-        transition={{ repeat: Infinity, duration: 0.8, ease: "easeInOut" }}
-      >
-        <svg width="110" height="70" viewBox="0 0 110 70" fill="none">
-          <rect x="10" y="25" width="88" height="28" rx="6" fill="#3b82f6" />
-          <rect x="25" y="12" width="58" height="16" rx="4" fill="#60a5fa" />
-          <circle cx="28" cy="53" r="10" fill="#1e293b" />
-          <circle cx="80" cy="53" r="10" fill="#1e293b" />
-          <circle cx="28" cy="53" r="5" fill="#94a3b8" />
-          <circle cx="80" cy="53" r="5" fill="#94a3b8" />
-          <rect x="45" y="20" width="18" height="8" rx="2" fill="#93c5fd" opacity="0.6" />
-        </svg>
-      </motion.div>
-    </motion.div>
-  );
-};
-
-// --- Bus with heavier motion ---
-const BusAnimation = () => {
-  return (
-    <motion.div
-      initial={{ x: -250 }}
-      animate={{ x: 250 }}
-      transition={{ duration: 2.8, ease: [0.25, 0.1, 0.25, 1] }}
-    >
-      <motion.div
-        animate={{ y: [0, -1, 0, 1, 0] }}
-        transition={{ repeat: Infinity, duration: 1, ease: "easeInOut" }}
-      >
-        <svg width="130" height="80" viewBox="0 0 130 80" fill="none">
-          <rect x="10" y="35" width="110" height="32" rx="8" fill="#a855f7" />
-          <rect x="20" y="18" width="88" height="22" rx="4" fill="#c084fc" />
-          {[35, 52, 69, 86].map((x) => (
-            <rect key={x} x={x} y="40" width="9" height="14" rx="2" fill="#1e293b" />
-          ))}
-          <circle cx="28" cy="67" r="9" fill="#1e293b" />
-          <circle cx="102" cy="67" r="9" fill="#1e293b" />
-          <circle cx="28" cy="67" r="4.5" fill="#94a3b8" />
-          <circle cx="102" cy="67" r="4.5" fill="#94a3b8" />
-        </svg>
-      </motion.div>
-    </motion.div>
-  );
-};
-
-// --- Train with track joints bounce and chuff effect ---
-const TrainAnimation = () => {
-  return (
-    <div className="relative">
-      {/* Railway track */}
-      <motion.div
-        className="absolute -bottom-8 w-full h-3 bg-gray-700 rounded-full"
-        animate={{ opacity: [0.6, 1, 0.6] }}
-        transition={{ repeat: Infinity, duration: 0.5 }}
-      >
-        <div className="absolute inset-x-0 h-0.5 bg-gray-500 top-1/2 -translate-y-1/2" />
-        {[...Array(10)].map((_, i) => (
-          <div key={i} className="absolute w-1 h-3 bg-gray-600" style={{ left: `${i * 10}%`, top: -2 }} />
-        ))}
-      </motion.div>
-      <motion.div
-        initial={{ x: -280 }}
-        animate={{ x: 280 }}
-        transition={{ duration: 3.2, ease: "linear" }}
-      >
-        <motion.div
-          animate={{ y: [0, -5, 0, -5, 0] }}
-          transition={{ repeat: Infinity, duration: 0.4, ease: "easeInOut" }}
-        >
-          <svg width="150" height="70" viewBox="0 0 150 70" fill="none">
-            <rect x="5" y="20" width="140" height="28" rx="6" fill="#f59e0b" />
-            <rect x="15" y="8" width="28" height="16" rx="3" fill="#fbbf24" />
-            <rect x="65" y="8" width="28" height="16" rx="3" fill="#fbbf24" />
-            <rect x="115" y="8" width="28" height="16" rx="3" fill="#fbbf24" />
-            <circle cx="25" cy="48" r="7" fill="#1e293b" />
-            <circle cx="55" cy="48" r="7" fill="#1e293b" />
-            <circle cx="85" cy="48" r="7" fill="#1e293b" />
-            <circle cx="125" cy="48" r="7" fill="#1e293b" />
-          </svg>
-          {/* Steam puffs */}
-          <motion.div
-            className="absolute -top-2 left-4 text-white/30 text-xl"
-            animate={{ x: [0, 20, 40], opacity: [0.5, 0] }}
-            transition={{ repeat: Infinity, duration: 0.6, ease: "easeOut" }}
-          >
-            💨
-          </motion.div>
-        </motion.div>
-      </motion.div>
-    </div>
-  );
-};
-
-// --- Flight with curved takeoff and contrail ---
-const FlightAnimation = () => {
-  return (
-    <motion.div
-      initial={{ x: -320, y: 0 }}
-      animate={{ x: 320, y: -70 }}
-      transition={{ duration: 3.8, ease: [0.33, 1, 0.68, 1] }}
-    >
-      <motion.div
-        animate={{ rotate: [0, -5, 0] }}
-        transition={{ repeat: Infinity, duration: 0.5 }}
-      >
-        <svg width="130" height="70" viewBox="0 0 130 70" fill="none">
-          <path d="M15 40 L35 28 L90 28 Q105 28 115 38 Q125 48 115 58 Q105 68 90 68 L35 68 L15 40 Z" fill="#ec4899" />
-          <path d="M55 28 L70 12 L85 28" fill="#f472b6" />
-          <path d="M35 28 L25 16 L45 22" fill="#f472b6" />
-          <circle cx="100" cy="48" r="4" fill="#fbcfe8" />
-        </svg>
-        {/* Contrail (fading trail) */}
-        <motion.div
-          className="absolute -left-20 top-8 h-1 bg-white/30 rounded-full blur-sm"
-          style={{ width: 80 }}
-          animate={{ opacity: [0, 0.6, 0], width: [40, 100, 140] }}
-          transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-        />
-      </motion.div>
-    </motion.div>
-  );
-};
-
-// --- Hotel with glow, scale, and sparkles ---
-const HotelAnimation = () => {
-  return (
-    <motion.div
-      initial={{ scale: 0.3, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      transition={{ type: "spring", stiffness: 200, damping: 15 }}
-      className="flex flex-col items-center"
-    >
+    <motion.div style={{ x }}>
       <div className="relative">
-        <svg width="120" height="100" viewBox="0 0 120 100" fill="none">
-          <rect x="15" y="30" width="90" height="60" rx="6" fill="#10b981" />
-          <rect x="45" y="55" width="30" height="35" rx="3" fill="#34d399" />
-          <rect x="35" y="42" width="10" height="10" rx="2" fill="#fef3c7" />
-          <rect x="75" y="42" width="10" height="10" rx="2" fill="#fef3c7" />
-          <rect x="55" y="65" width="10" height="15" rx="2" fill="#fef3c7" />
-          <path d="M15 30 L60 10 L105 30" fill="#059669" stroke="none" />
+        <svg width="110" height="80" viewBox="0 0 110 80" fill="none">
+          {/* Hand-drawn bike – multiple strokes for each line */}
+          <g stroke="#2c2c2c" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
+            {/* Main frame – double lines for sketchy look */}
+            <path d="M28 50 L38 28 L58 28 L70 50" strokeDasharray="2 1" />
+            <path d="M29 50 L39 29 L57 29 L69 50" strokeDasharray="3 2" opacity="0.6" />
+            {/* Wheels – slightly irregular circles */}
+            <circle cx="30" cy="58" r="11" strokeDasharray="4 2" />
+            <circle cx="30" cy="58" r="10" strokeDasharray="2 3" opacity="0.5" />
+            <circle cx="64" cy="58" r="11" strokeDasharray="5 1" />
+            <circle cx="64" cy="58" r="10" strokeDasharray="1 4" opacity="0.5" />
+            {/* Handlebars & seat */}
+            <path d="M38 28 L35 22 L42 23" />
+            <path d="M52 28 L55 22" />
+            {/* Pedals */}
+            <line x1="42" y1="40" x2="48" y2="44" strokeDasharray="2 2" />
+          </g>
         </svg>
-        {/* Glow behind hotel */}
-        <motion.div
-          className="absolute inset-0 rounded-full bg-emerald-500 blur-2xl -z-10"
-          animate={{ scale: [0.8, 1.2, 0.8], opacity: [0.3, 0.6, 0.3] }}
-          transition={{ repeat: Infinity, duration: 2 }}
-        />
+        {/* Dust – sketchy dots */}
+        {[...Array(6)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute w-1.5 h-1.5 bg-stone-400 rounded-full"
+            style={{ left: -10, bottom: 12 }}
+            animate={{ x: [-10, -35], opacity: [0.6, 0] }}
+            transition={{ repeat: Infinity, duration: 0.3, delay: i * 0.05 }}
+          />
+        ))}
       </div>
-      {/* Sparkles */}
-      {[...Array(6)].map((_, i) => (
-        <motion.div
-          key={i}
-          className="absolute text-yellow-300 text-lg"
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: [0, 1, 0], opacity: [0, 1, 0], y: [-10, -30] }}
-          transition={{ repeat: Infinity, duration: 1.5, delay: i * 0.2 }}
-          style={{ left: `${20 + i * 12}%`, top: "10%" }}
-        >
-          ✨
+    </motion.div>
+  );
+};
+
+const SketchCar = ({ progress }: { progress: any }) => {
+  const x = useTransform(progress, [0, 1], [-200, 200]);
+  return (
+    <motion.div style={{ x }}>
+      <svg width="130" height="80" viewBox="0 0 130 80" fill="none">
+        <g stroke="#2c2c2c" strokeWidth="1.5" fill="none" strokeLinecap="round">
+          <rect x="15" y="30" width="95" height="28" rx="4" strokeDasharray="5 2" />
+          <rect x="18" y="32" width="90" height="24" rx="3" strokeDasharray="2 3" opacity="0.5" />
+          <rect x="30" y="18" width="65" height="15" rx="3" strokeDasharray="4 2" />
+          <circle cx="35" cy="58" r="10" strokeDasharray="3 2" />
+          <circle cx="35" cy="58" r="8" strokeDasharray="1 3" opacity="0.5" />
+          <circle cx="90" cy="58" r="10" strokeDasharray="4 1" />
+          <circle cx="90" cy="58" r="8" strokeDasharray="2 2" opacity="0.5" />
+          {/* Windows */}
+          <rect x="40" y="22" width="12" height="8" rx="1" strokeDasharray="2 1" />
+          <rect x="60" y="22" width="12" height="8" rx="1" strokeDasharray="2 1" />
+          <rect x="80" y="22" width="12" height="8" rx="1" strokeDasharray="2 1" />
+        </g>
+      </svg>
+    </motion.div>
+  );
+};
+
+const SketchBus = ({ progress }: { progress: any }) => {
+  const x = useTransform(progress, [0, 1], [-230, 230]);
+  return (
+    <motion.div style={{ x }}>
+      <svg width="150" height="90" viewBox="0 0 150 90" fill="none">
+        <g stroke="#2c2c2c" strokeWidth="1.5" fill="none" strokeLinecap="round">
+          <rect x="10" y="40" width="125" height="32" rx="6" strokeDasharray="6 3" />
+          <rect x="15" y="22" width="115" height="20" rx="4" strokeDasharray="3 2" />
+          {[25, 45, 65, 85, 105].map((x, i) => (
+            <rect key={i} x={x} y="46" width="12" height="14" rx="1" strokeDasharray="2 2" />
+          ))}
+          <circle cx="30" cy="72" r="9" strokeDasharray="4 2" />
+          <circle cx="30" cy="72" r="7" strokeDasharray="1 2" opacity="0.5" />
+          <circle cx="115" cy="72" r="9" strokeDasharray="3 3" />
+          <circle cx="115" cy="72" r="7" strokeDasharray="2 1" opacity="0.5" />
+        </g>
+      </svg>
+    </motion.div>
+  );
+};
+
+const SketchTrain = ({ progress }: { progress: any }) => {
+  const x = useTransform(progress, [0, 1], [-280, 280]);
+  return (
+    <div className="relative">
+      <div className="absolute -bottom-10 w-full h-2 bg-stone-400/30 rounded-full">
+        {[...Array(12)].map((_, i) => (
+          <div key={i} className="absolute w-1 h-3 bg-stone-500/40" style={{ left: `${i * 8.33}%`, top: -4 }} />
+        ))}
+      </div>
+      <motion.div style={{ x }}>
+        <motion.div animate={{ y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 0.3 }}>
+          <svg width="170" height="80" viewBox="0 0 170 80" fill="none">
+            <g stroke="#2c2c2c" strokeWidth="1.5" fill="none" strokeLinecap="round">
+              <rect x="5" y="25" width="155" height="28" rx="4" strokeDasharray="5 2" />
+              <rect x="15" y="12" width="32" height="15" rx="2" strokeDasharray="3 2" />
+              <rect x="70" y="12" width="32" height="15" rx="2" strokeDasharray="4 1" />
+              <rect x="125" y="12" width="32" height="15" rx="2" strokeDasharray="2 3" />
+              <circle cx="25" cy="53" r="8" strokeDasharray="3 2" />
+              <circle cx="60" cy="53" r="8" strokeDasharray="2 2" />
+              <circle cx="95" cy="53" r="8" strokeDasharray="4 1" />
+              <circle cx="140" cy="53" r="8" strokeDasharray="3 3" />
+            </g>
+          </svg>
         </motion.div>
-      ))}
+      </motion.div>
+    </div>
+  );
+};
+
+const SketchFlight = ({ progress }: { progress: any }) => {
+  const x = useTransform(progress, [0, 1], [-320, 320]);
+  const y = useTransform(progress, [0, 0.3, 1], [0, -15, -60]);
+  return (
+    <motion.div style={{ x, y }}>
+      <svg width="140" height="80" viewBox="0 0 140 80" fill="none">
+        <g stroke="#2c2c2c" strokeWidth="1.5" fill="none" strokeLinecap="round">
+          <path d="M15 45 L35 32 L100 32 Q115 32 125 42 Q135 52 125 62 Q115 72 100 72 L35 72 L15 45 Z" strokeDasharray="6 2" />
+          <path d="M15 45 L35 32 L100 32 Q115 32 125 42 Q135 52 125 62 Q115 72 100 72 L35 72 L15 45 Z" strokeDasharray="3 4" opacity="0.5" transform="translate(1,1)" />
+          <path d="M60 32 L75 14 L90 32" strokeDasharray="2 2" />
+          <path d="M35 32 L23 18 L45 26" strokeDasharray="3 1" />
+          {/* Contrail – sketchy dashed line */}
+          <path d="M-10 42 L20 44" strokeDasharray="4 2" strokeWidth="1" opacity="0.6" />
+        </g>
+      </svg>
+    </motion.div>
+  );
+};
+
+const SketchHotel = ({ progress }: { progress: any }) => {
+  const scale = useTransform(progress, [0, 0.4, 1], [0.6, 1.1, 1]);
+  return (
+    <motion.div style={{ scale }} className="flex flex-col items-center">
+      <svg width="130" height="110" viewBox="0 0 130 110" fill="none">
+        <g stroke="#2c2c2c" strokeWidth="1.5" fill="none" strokeLinecap="round">
+          <rect x="15" y="35" width="100" height="60" rx="4" strokeDasharray="5 2" />
+          <rect x="50" y="62" width="30" height="33" rx="2" strokeDasharray="3 2" />
+          <rect x="38" y="48" width="12" height="12" rx="1" strokeDasharray="2 2" />
+          <rect x="80" y="48" width="12" height="12" rx="1" strokeDasharray="2 2" />
+          <rect x="62" y="72" width="8" height="12" rx="1" strokeDasharray="1 2" />
+          <path d="M15 35 L65 12 L115 35" strokeDasharray="4 2" />
+          {/* Chimney smoke sketch */}
+          <path d="M100 12 L100 5" strokeDasharray="2 1" />
+          <circle cx="100" cy="3" r="2" strokeDasharray="1 1" opacity="0.5" />
+        </g>
+      </svg>
+      <div className="text-stone-600 text-xs mt-3 italic">✦ welcome ✦</div>
     </motion.div>
   );
 };
