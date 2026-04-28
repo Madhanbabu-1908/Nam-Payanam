@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { MapPin, ArrowRight, Calendar, Users } from 'lucide-react';
-import LoadingScreen from '../components/LoadingScreen';
+import LoadingScreen from '../components/common/VehicleLoader';
 import toast from 'react-hot-toast';
 
 export default function JoinPage() {
