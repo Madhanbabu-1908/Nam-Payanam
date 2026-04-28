@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { api } from '../config/api';
 import { Plus, MapPin, LogOut, ChevronRight, Calendar, Wallet, Hash, User } from 'lucide-react';
 import { Trip } from '../types';
-import LoadingScreen from '../components/LoadingScreen';
+import LoadingScreen from '../components/common/VehicleLoader';
 import toast from 'react-hot-toast';
 
 function TripCard({ trip, onClick }: { trip: Trip; onClick: () => void }) {
