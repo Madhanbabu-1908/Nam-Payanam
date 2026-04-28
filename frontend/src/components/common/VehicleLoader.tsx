@@ -2,9 +2,13 @@ import { motion, useMotionValue, useTransform, animate, useSpring } from "framer
 import { useEffect, useState } from "react";
 
 interface VehicleLoaderProps {
+  /** Custom message (overrides step messages) */
   message?: string;
+  /** Current loading stage: 0 = route, 1 = traffic, 2 = arrival */
   step?: number;
+  /** Optional progress percentage (0-100) */
   progress?: number;
+  /** Callback when loading completes (after step 2 finishes) */
   onComplete?: () => void;
 }
 
@@ -143,9 +147,8 @@ export default function VehicleLoader({
               strokeLinecap="round"
             />
             
-            {/* Blinking nodes along path */}
+            {/* Blinking nodes along path - FIXED: using motion.circle */}
             {[0.2, 0.4, 0.6, 0.8].map((t, idx) => {
-              // Approximate point on path (simplified)
               const x = 20 + (t * 460);
               const y = 100 + Math.sin(t * Math.PI * 2) * 30;
               return (
@@ -182,7 +185,14 @@ export default function VehicleLoader({
               <circle cx="-6" cy="9" r="4.5" fill="#1e293b"/>
               <circle cx="6" cy="9" r="4.5" fill="#1e293b"/>
               {/* Car headlights glow */}
-              <circle cx="14" cy="-3" r="3" fill="#fbbf24" animate={{ opacity: [0.6, 1, 0.6] }} transition={{ repeat: Infinity, duration: 0.5 }}/>
+              <motion.circle
+                cx="14"
+                cy="-3"
+                r="3"
+                fill="#fbbf24"
+                animate={{ opacity: [0.6, 1, 0.6] }}
+                transition={{ repeat: Infinity, duration: 0.5 }}
+              />
             </motion.g>
           </svg>
         </div>
@@ -234,20 +244,19 @@ export default function VehicleLoader({
         {/* Progress bar with wave effect */}
         <div className="w-full bg-slate-700/50 rounded-full h-2.5 mb-2 overflow-hidden backdrop-blur-sm">
           <motion.div
-            className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full"
+            className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full relative"
             style={{ width: useTransform(springProgress, (v) => `${v}%`) }}
             transition={{ duration: 0.2 }}
           >
             {/* Shimmer overlay */}
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-45"
-                 style={{ width: "100%", height: "100%" }} />
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-45 w-full h-full" />
           </motion.div>
         </div>
         <div className="text-right text-xs text-indigo-300 font-mono animate-pulse">
           {Math.floor(progressValue)}%
         </div>
 
-        {/* Particle system (flyin dots) */}
+        {/* Particle system (flying dots) */}
         <div className="relative h-12 w-full mt-4">
           {[...Array(8)].map((_, i) => (
             <motion.div
