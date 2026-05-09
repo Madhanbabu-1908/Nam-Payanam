@@ -8,7 +8,7 @@ import { getRealRoute } from '../utils/routeUtils';
 export const tripController = {
 
   // ✅ CREATE TRIP
-  createTrip: async (req: AuthRequest, res: Response, next: NextFunction) => {
+    createTrip: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const {
         name,
@@ -29,7 +29,16 @@ export const tripController = {
         return res.status(401).json({ success: false, error: 'User not authenticated' });
       }
 
+      // 1. Validate Required Fields
+      if (!name || !destination || !start_date || !end_date) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Missing required fields: name, destination, start_date, end_date' 
+        });
+      }
+
       const userId = req.user.id;
+      console.log(`🚀 Creating trip for user: ${userId}`);
 
       let routeCoords: [number, number][] = [];
 
@@ -39,54 +48,63 @@ export const tripController = {
             [Number(start_lat), Number(start_lng)],
             [Number(destination_lat), Number(destination_lng)]
           );
-        } catch {
-          console.warn("⚠️ Route fetch failed");
+        } catch (routeErr) {
+          console.warn("⚠️ Route fetch failed, continuing without route:", routeErr);
         }
       }
 
       const tripCode = Math.random().toString(36).substring(2, 8).toUpperCase();
 
-      const newTrip = await tripService.createTrip({
+      // 2. Prepare Data with Safe Defaults
+      const tripData = {
         organizer_id: userId,
         name,
         destination,
         start_location,
-        destination_lat: destination_lat ? Number(destination_lat) : undefined,
-        destination_lng: destination_lng ? Number(destination_lng) : undefined,
-        start_lat: start_lat ? Number(start_lat) : undefined,
-        start_lng: start_lng ? Number(start_lng) : undefined,
-        route: routeCoords.length
+        destination_lat: destination_lat ? Number(destination_lat) : null,
+        destination_lng: destination_lng ? Number(destination_lng) : null,
+        start_lat: start_lat ? Number(start_lat) : null,
+        start_lng: start_lng ? Number(start_lng) : null,
+        route: routeCoords.length > 0
           ? { type: "LineString", coordinates: routeCoords }
-          : undefined,
+          : null,
         start_date,
         end_date,
         budget: budget ? Number(budget) : 0,
-        mode,
+        mode: mode || 'MANUAL',
         status: 'PLANNING',
         trip_code: tripCode,
-      });
+      };
 
-      await supabaseAdmin.from('trip_members').insert({
+      // 3. Create Trip
+      const newTrip = await tripService.createTrip(tripData);
+
+      if (!newTrip || !newTrip.id) {
+        throw new Error("Trip creation returned no ID");
+      }
+
+      // 4. Add Organizer as Member
+      const { error: memberError } = await supabaseAdmin.from('trip_members').insert({
         trip_id: newTrip.id,
         user_id: userId,
         role: 'ORGANIZER'
       });
 
-      // 🤖 AI
+      if (memberError) {
+        console.error("❌ Failed to add organizer as member:", memberError);
+        // Optional: Delete the trip if member insertion fails to avoid orphaned trips
+        await supabaseAdmin.from('trips').delete().eq('id', newTrip.id);
+        throw new Error("Failed to assign organizer role");
+      }
+
+      // 5. AI Itinerary Generation (Non-blocking)
       if (mode === 'AI' && interests && start_location) {
-        try {
-          const days =
-            Math.ceil(
-              (new Date(end_date).getTime() - new Date(start_date).getTime()) /
-              (1000 * 60 * 60 * 24)
-            ) + 1;
-
-          const aiResponse = await aiService.generateItinerary(
-            `${days} day trip from ${start_location} to ${destination} with budget ${budget}. Interests: ${interests}`
-          );
-
+        // Run AI in background so it doesn't delay the response
+        aiService.generateItinerary(
+          `${Math.ceil((new Date(end_date).getTime() - new Date(start_date).getTime()) / (1000 * 60 * 60 * 24)) + 1} day trip from ${start_location} to ${destination} with budget ${budget}. Interests: ${interests}`
+        ).then(async (aiResponse) => {
           if (aiResponse?.days) {
-            const items = aiResponse.days.flatMap((day: any) =>
+             const items = aiResponse.days.flatMap((day: any) =>
               (day.activities || []).map((act: any) => ({
                 trip_id: newTrip.id,
                 day: day.day,
@@ -95,21 +113,25 @@ export const tripController = {
                 notes: act.notes
               }))
             );
-
             if (items.length) {
               await supabaseAdmin.from('itinerary_items').insert(items);
+              console.log("✅ AI Itinerary generated");
             }
           }
-        } catch (err: any) {
-          console.error("❌ AI failed:", err.message);
-        }
+        }).catch(err => console.error("❌ AI Background Job Failed:", err));
       }
 
       res.status(201).json({ success: true, data: newTrip });
 
     } catch (error: any) {
-      console.error("❌ createTrip error:", error.message);
-      next(error);
+      console.error("❌ createTrip CRITICAL ERROR:", error);
+      
+      // Send specific error message if available, otherwise generic
+      res.status(500).json({ 
+        success: false, 
+        error: error.message || 'Failed to create trip',
+        details: process.env.NODE_ENV === 'development' ? error : undefined
+      });
     }
   },
 
