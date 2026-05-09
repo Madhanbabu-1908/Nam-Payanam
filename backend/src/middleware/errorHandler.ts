@@ -7,17 +7,28 @@ export const errorHandler = (
   res: Response,
   next: NextFunction
 ) => {
-  console.error('❌ Global Error:', err.stack);
+  // ✅ Better error logging - handle cases where err is undefined or malformed
+  const errorMessage = err?.message || err?.error || JSON.stringify(err) || 'Unknown error';
+  const errorStack = err?.stack || 'No stack trace available';
+  
+  console.error('❌ Global Error:', {
+    message: errorMessage,
+    code: err?.code,
+    status: err?.status,
+    stack: errorStack,
+    url: req.url,
+    method: req.method,
+  });
 
   // Supabase Specific Errors
-  if (err.code === '23503') { // Foreign key violation
+  if (err?.code === '23503') { // Foreign key violation
     return res.status(400).json({
       success: false,
       error: 'Invalid reference data. Please check related records.'
     });
   }
 
-  if (err.code === '23505') { // Unique violation
+  if (err?.code === '23505') { // Unique violation
     return res.status(409).json({
       success: false,
       error: 'A record with this unique value already exists.'
@@ -25,14 +36,14 @@ export const errorHandler = (
   }
 
   // Default Error
-  const statusCode = err.status || 500;
+  const statusCode = err?.status || 500;
   const message = env.NODE_ENV === 'production' && statusCode === 500 
     ? 'Internal Server Error' 
-    : err.message;
+    : errorMessage;
 
   res.status(statusCode).json({
     success: false,
     error: message,
-    ...(env.NODE_ENV !== 'production' && { stack: err.stack })
+    ...(env.NODE_ENV !== 'production' && { stack: errorStack })
   });
 };
