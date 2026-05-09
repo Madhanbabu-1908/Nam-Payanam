@@ -7,7 +7,7 @@ const router = Router();
 router.use(authMiddleware);
 
 // GET /api/itinerary/trip/:tripId
-router.get('/trip/:tripId', itineraryController.getItineraryByTrip);
+router.get('/trips/:tripId', itineraryController.getItineraryByTrip);
 
 // POST /api/itinerary/:tripId (Add Stop)
 router.post('/:tripId', requireOrganizer, itineraryController.addStop);
