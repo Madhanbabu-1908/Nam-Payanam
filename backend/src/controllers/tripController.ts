@@ -8,7 +8,7 @@ import { getRealRoute } from '../utils/routeUtils';
 export const tripController = {
 
   // ✅ CREATE TRIP
-    createTrip: async (req: AuthRequest, res: Response, next: NextFunction) => {
+  createTrip: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const {
         name,
@@ -56,13 +56,11 @@ export const tripController = {
       const tripCode = Math.random().toString(36).substring(2, 8).toUpperCase();
 
       // 2. Prepare Data with Safe Defaults
-           // 2. Prepare Data with Safe Defaults (Use undefined instead of null)
-           const tripData = {
+      const tripData = {
         organizer_id: userId,
         name,
         destination,
         start_location,
-        // Use undefined if the value is missing, not null
         destination_lat: destination_lat ? Number(destination_lat) : undefined,
         destination_lng: destination_lng ? Number(destination_lng) : undefined,
         start_lat: start_lat ? Number(start_lat) : undefined,
@@ -76,7 +74,7 @@ export const tripController = {
         end_date,
         budget: budget ? Number(budget) : 0,
         mode: mode || 'MANUAL',
-        status: 'PLANNING' as const, // <--- ADD 'as const' HERE
+        status: 'PLANNING' as const,
         trip_code: tripCode,
       };
 
@@ -96,14 +94,12 @@ export const tripController = {
 
       if (memberError) {
         console.error("❌ Failed to add organizer as member:", memberError);
-        // Optional: Delete the trip if member insertion fails to avoid orphaned trips
         await supabaseAdmin.from('trips').delete().eq('id', newTrip.id);
         throw new Error("Failed to assign organizer role");
       }
 
       // 5. AI Itinerary Generation (Non-blocking)
       if (mode === 'AI' && interests && start_location) {
-        // Run AI in background so it doesn't delay the response
         aiService.generateItinerary(
           `${Math.ceil((new Date(end_date).getTime() - new Date(start_date).getTime()) / (1000 * 60 * 60 * 24)) + 1} day trip from ${start_location} to ${destination} with budget ${budget}. Interests: ${interests}`
         ).then(async (aiResponse) => {
@@ -129,8 +125,6 @@ export const tripController = {
 
     } catch (error: any) {
       console.error("❌ createTrip CRITICAL ERROR:", error);
-      
-      // Send specific error message if available, otherwise generic
       res.status(500).json({ 
         success: false, 
         error: error.message || 'Failed to create trip',
@@ -218,7 +212,7 @@ export const tripController = {
     }
   },
 
-  // ✅ JOIN BY CODE (FIXED)
+  // ✅ JOIN BY CODE
   joinByCode: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { code } = req.body;
@@ -247,7 +241,7 @@ export const tripController = {
     }
   },
 
-  // ✅ UPDATE TRIP (FIXED)
+  // ✅ UPDATE TRIP
   updateTrip: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { tripId } = req.params;
@@ -275,7 +269,7 @@ export const tripController = {
     }
   },
 
-  // ✅ DELETE TRIP (FIXED)
+  // ✅ DELETE TRIP
   deleteTrip: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { tripId } = req.params;
@@ -294,28 +288,53 @@ export const tripController = {
     }
   },
 
-  // ✅ MEMBERS
+  // ✅ MEMBERS (FIXED: Manual Join to avoid Schema Relationship Error)
   getMembers: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { tripId } = req.params;
 
-      const { data, error } = await supabaseAdmin
+      // 1. Fetch member IDs and roles from trip_members
+      const { data: members, error: membersError } = await supabaseAdmin
         .from('trip_members')
-        .select(`
-          user_id,
-          role,
-          profiles (
-            full_name,
-            email
-          )
-        `)
+        .select('user_id, role')
         .eq('trip_id', tripId);
 
-      if (error) throw error;
+      if (membersError) throw membersError;
 
-      res.json({ success: true, data });
+      if (!members || members.length === 0) {
+        return res.json({ success: true, data: [] });
+      }
+
+      // 2. Extract user IDs
+      const userIds = members.map(m => m.user_id);
+
+      // 3. Fetch profile details for these users
+      // Ensure your profiles table has an 'id' column that matches auth.users.id
+      const { data: profiles, error: profilesError } = await supabaseAdmin
+        .from('profiles')
+        .select('id, full_name, email, avatar_url')
+        .in('id', userIds);
+
+      if (profilesError) throw profilesError;
+
+      // 4. Combine the data manually
+      const enrichedMembers = members.map(member => {
+        const profile = profiles?.find(p => p.id === member.user_id);
+        return {
+          user_id: member.user_id,
+          role: member.role,
+          profiles: profile ? {
+            full_name: profile.full_name,
+            email: profile.email,
+            avatar_url: profile.avatar_url
+          } : null
+        };
+      });
+
+      res.json({ success: true, data: enrichedMembers });
 
     } catch (err: any) {
+      console.error("❌ Get Members Crash:", err);
       next(err);
     }
   }
