@@ -49,9 +49,10 @@ router.get('/:tripId', tripController.getTrip);
 
 /**
  * ✏️ UPDATE TRIP (Organizer only)
- * PUT /trips/:tripId
+ * Supports both PUT and PATCH for frontend compatibility
  */
 router.put('/:tripId', requireOrganizer, tripController.updateTrip);
+router.patch('/:tripId', requireOrganizer, tripController.updateTrip);
 
 /**
  * ❌ DELETE TRIP (Organizer only)
