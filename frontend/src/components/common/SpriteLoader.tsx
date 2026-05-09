@@ -1,30 +1,25 @@
 import { useEffect, useState, useMemo } from 'react';
-import { motion } from 'framer-motion';
 
 interface SpriteLoaderProps {
-  fps?: number;
-  color?: string;
+  fps?: number; // Frames per second
+  color?: string; 
 }
 
 export default function SpriteLoader({ fps = 12, color = "#3b82f6" }: SpriteLoaderProps) {
   const [currentFrameIndex, setCurrentFrameIndex] = useState(0);
-  const [isReady, setIsReady] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [frames, setFrames] = useState<string[]>([]);
+  const [isLoaded, setIsLoaded] = useState(false);
 
-  // 1. Dynamically import ALL SVGs in the folder
-  // IMPORTANT: Ensure the path matches your actual folder structure
+  // 1. Dynamically import ALL SVGs
+  // Note: Ensure this path matches your actual folder structure
   const svgModules = import.meta.glob('../../assets/frames/*.svg', { 
     eager: true, 
     as: 'url' 
   });
 
-  // 2. Convert to sorted Array
-  const frames = useMemo(() => {
-    if (!svgModules || Object.keys(svgModules).length === 0) {
-      console.error("❌ No SVGs found in ../../assets/plane-frames/");
-      setError("No SVGs found. Check folder path.");
-      return [];
-    }
+  // 2. Sort and Prepare URLs
+  const sortedUrls = useMemo(() => {
+    if (!svgModules || Object.keys(svgModules).length === 0) return [];
     
     const entries = Object.entries(svgModules);
     
@@ -35,20 +30,38 @@ export default function SpriteLoader({ fps = 12, color = "#3b82f6" }: SpriteLoad
       return numA - numB;
     });
     
-    console.log(`✅ Found ${sortedEntries.length} frames.`);
     return sortedEntries.map(([_, url]) => url as string);
   }, []);
 
-  // 3. Set ready state
+  // 3. Preload Images into Browser Cache
   useEffect(() => {
-    if (frames.length > 0) {
-      setIsReady(true);
-    }
-  }, [frames]);
+    if (sortedUrls.length === 0) return;
+
+    let loadedCount = 0;
+    const totalImages = sortedUrls.length;
+
+    sortedUrls.forEach((url) => {
+      const img = new Image();
+      img.src = url;
+      img.onload = () => {
+        loadedCount++;
+        if (loadedCount === totalImages) {
+          setIsLoaded(true);
+        }
+      };
+      img.onerror = () => {
+        console.error(`Failed to preload image: ${url}`);
+        loadedCount++; // Count it anyway to avoid infinite hang
+        if (loadedCount === totalImages) {
+          setIsLoaded(true);
+        }
+      };
+    });
+  }, [sortedUrls]);
 
   // 4. Animation Loop
   useEffect(() => {
-    if (!isReady || frames.length === 0) return;
+    if (!isLoaded || frames.length === 0) return;
 
     const intervalTime = 1000 / fps;
     const timer = setInterval(() => {
@@ -56,49 +69,39 @@ export default function SpriteLoader({ fps = 12, color = "#3b82f6" }: SpriteLoad
     }, intervalTime);
 
     return () => clearInterval(timer);
-  }, [frames.length, fps, isReady]);
+  }, [frames.length, fps, isLoaded]);
 
-  // --- DEBUG UI ---
-  if (error) {
+  // Update frames state once preloading is done
+  useEffect(() => {
+    if (isLoaded && sortedUrls.length > 0) {
+      setFrames(sortedUrls);
+    }
+  }, [isLoaded, sortedUrls]);
+
+  // Loading State
+  if (!isLoaded || frames.length === 0) {
     return (
-      <div className="text-red-500 text-xs p-4 bg-red-900/20 rounded border border-red-500/50">
-        <p>⚠️ Error: {error}</p>
-        <p className="mt-2">Check console logs for details.</p>
+      <div className="w-[220px] h-[140px] bg-slate-800/50 rounded-lg animate-pulse flex items-center justify-center">
+        <span className="text-xs text-slate-500">Loading Assets...</span>
       </div>
     );
   }
 
-  if (!isReady) {
-    return <div className="w-[220px] h-[140px] bg-slate-800/50 rounded-lg animate-pulse flex items-center justify-center text-xs text-slate-500">Loading Assets...</div>;
-  }
-
-  if (frames.length === 0) {
-    return <div className="text-yellow-500 text-xs">No frames loaded.</div>;
-  }
-
   return (
-    <div className="relative w-[220px] h-[140px]">
+    <div className="relative w-[220px] h-[140px] overflow-hidden">
       {/* 
-         We use img tag. 
-         If SVGs are transparent, they will show against the dark bg.
-         If they have white bg, they will look like white boxes.
+         SINGLE IMG TAG WITHOUT KEY.
+         This prevents React from unmounting/remounting the element.
+         We simply swap the src attribute.
       */}
-      <motion.img
-        key={currentFrameIndex}
+      <img
         src={frames[currentFrameIndex]}
-        alt={`Frame ${currentFrameIndex + 1}`}
-        className="w-full h-full object-contain drop-shadow-[0_0_15px_rgba(59,130,246,0.5)]"
+        alt="Plane Animation"
+        className="w-full h-full object-contain drop-shadow-[0_0_15px_rgba(59,130,246,0.5)] transition-opacity duration-75"
         style={{ 
           filter: `drop-shadow(0 0 5px ${color})`,
         }}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.05 }}
-        onError={(e) => console.error("Failed to load frame:", frames[currentFrameIndex])}
       />
-      
-      {/* Optional: Show current frame index for debugging */}
-      {/* <div className="absolute bottom-0 right-0 text-[10px] text-white/50">{currentFrameIndex + 1}/{frames.length}</div> */}
     </div>
   );
 }
