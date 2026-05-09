@@ -21,7 +21,7 @@ export default function VehicleLoader({ message }: VehicleLoaderProps) {
 
       {/* 2. The Animation Layer (Full Screen) */}
       <div className="absolute inset-0 z-0">
-        <SpriteLoader fps={15} color="#3b82f6" />
+        <SpriteLoader fps={8} color="#3b82f6" />
       </div>
 
       {/* 
