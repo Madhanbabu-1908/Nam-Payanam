@@ -12,8 +12,12 @@ const QUICK = [
   { icon:'🚨', label:'Emergency info', q:'What are key hospitals, police stations, and emergency contacts along this route?' },
 ];
 
-function formatMsg(t: string) {
-  return t.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\*(.*?)\*/g,'<em>$1</em>').replace(/\n/g,'<br/>');
+// ✅ FIX: Handle undefined/null content safely
+function formatMsg(t: string | undefined | null) {
+  if (!t) return ''; // Return empty string if content is missing
+  return t.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
+          .replace(/\*(.*?)\*/g,'<em>$1</em>')
+          .replace(/\n/g,'<br/>');
 }
 
 export default function AIPage() {
@@ -46,7 +50,9 @@ export default function AIPage() {
     setLoading(true);
     try {
       const res = await api.post(`/ai/trips/${tripId}/chat`, { message: msg });
-      setMessages(p => [...p, { role:'assistant', content: res.data.data?.response || 'No response' }]);
+      // ✅ FIX: Ensure response exists before adding to state
+      const aiResponse = res.data.data?.response || 'No response received.';
+      setMessages(p => [...p, { role:'assistant', content: aiResponse }]);
     } catch {
       setMessages(p => [...p, { role:'assistant', content:'⚠️ I had trouble responding. Please try again.' }]);
     } finally { setLoading(false); }
@@ -78,7 +84,7 @@ export default function AIPage() {
             {(['chat','budget'] as const).map(t => (
               <button key={t} onClick={() => { setTab(t); if(t==='budget'&&!budgetData) loadBudget(); }}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all capitalize ${tab===t?'bg-brand text-white':'bg-[var(--bg)] text-[var(--muted)]'}`}>
-                {t==='chat'?'💬 Chat':'💰 Budget'}
+                {t==='chat'?'💬 Chat':' Budget'}
               </button>
             ))}
           </div>
@@ -97,7 +103,8 @@ export default function AIPage() {
                   </div>
                 )}
                 <div className={m.role==='user'?'chat-bubble-user':'chat-bubble-ai'}
-                  dangerouslySetInnerHTML={{__html:formatMsg(m.content)}}/>
+                  {/* ✅ FIX: Pass m.content safely to formatMsg */}
+                  dangerouslySetInnerHTML={{__html: formatMsg(m.content)}}/>
               </div>
             ))}
             {loading && (
@@ -167,7 +174,7 @@ export default function AIPage() {
                     return (
                       <div key={k}>
                         <div className="flex justify-between text-sm mb-1">
-                          <span className="font-semibold text-[var(--text)] capitalize">{k.replace('_',' ')}</span>
+                          <span className="font-semibold text-[var(--text)] capitalize">{String(k).replace('_',' ')}</span>
                           <span className="font-bold text-[var(--text)]">₹{v?.toLocaleString('en-IN')}</span>
                         </div>
                         <div className="progress-track">
