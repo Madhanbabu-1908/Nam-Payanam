@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../config/api';
-import { ArrowLeft, Send, Sparkles, TrendingUp, RefreshCw, Wallet } from 'lucide-react';
+import { ArrowLeft, Send, Sparkles, RefreshCw, Wallet } from 'lucide-react';
 
 const QUICK = [
   { icon:'🍽️', label:'Best food stops', q:'What are the best local food stops and restaurants on this route?' },
@@ -12,9 +12,9 @@ const QUICK = [
   { icon:'🚨', label:'Emergency info', q:'What are key hospitals, police stations, and emergency contacts along this route?' },
 ];
 
-// ✅ FIX: Handle undefined/null content safely
+// ✅ Safe formatter
 function formatMsg(t: string | undefined | null) {
-  if (!t) return ''; // Return empty string if content is missing
+  if (!t) return '';
   return t.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
           .replace(/\*(.*?)\*/g,'<em>$1</em>')
           .replace(/\n/g,'<br/>');
@@ -32,11 +32,10 @@ export default function AIPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Load chat history
     api.get(`/ai/trips/${tripId}/chat`).then(r => {
       setMessages(r.data.data || []);
     }).catch(() => {
-      setMessages([{ role:'assistant', content:'Vanakkam! 🙏 I\'m your Nam Payanam AI companion.\n\nAsk me anything about your trip — food stops, hotels, costs, safety tips, or local secrets!', created_at: new Date() }]);
+      setMessages([{ role:'assistant', content:'Vanakkam! 🙏 I\'m your Nam Payanam AI companion.', created_at: new Date() }]);
     });
   }, [tripId]);
 
@@ -50,7 +49,6 @@ export default function AIPage() {
     setLoading(true);
     try {
       const res = await api.post(`/ai/trips/${tripId}/chat`, { message: msg });
-      // ✅ FIX: Ensure response exists before adding to state
       const aiResponse = res.data.data?.response || 'No response received.';
       setMessages(p => [...p, { role:'assistant', content: aiResponse }]);
     } catch {
@@ -69,6 +67,7 @@ export default function AIPage() {
 
   return (
     <div className="flex flex-col h-screen bg-[var(--bg)] pt-safe">
+      {/* Header */}
       <header className="glass z-20 px-4 py-3">
         <div className="flex items-center gap-3 max-w-2xl mx-auto">
           <button onClick={() => navigate(-1)} className="btn-icon bg-[var(--bg)]">
@@ -82,18 +81,22 @@ export default function AIPage() {
           </div>
           <div className="flex gap-1">
             {(['chat','budget'] as const).map(t => (
-              <button key={t} onClick={() => { setTab(t); if(t==='budget'&&!budgetData) loadBudget(); }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all capitalize ${tab===t?'bg-brand text-white':'bg-[var(--bg)] text-[var(--muted)]'}`}>
-                {t==='chat'?'💬 Chat':' Budget'}
+              <button 
+                key={t} 
+                onClick={() => { setTab(t); if(t==='budget'&&!budgetData) loadBudget(); }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all capitalize ${tab===t?'bg-brand text-white':'bg-[var(--bg)] text-[var(--muted)]'}`}
+              >
+                {t === 'chat' ? '💬 Chat' : '💰 Budget'}
               </button>
             ))}
           </div>
         </div>
       </header>
 
+      {/* Content */}
       {tab === 'chat' ? (
         <>
-          {/* Messages */}
+          {/* Messages List */}
           <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 max-w-2xl mx-auto w-full scrollbar-hide">
             {messages.map((m,i) => (
               <div key={i} className={`flex ${m.role==='user'?'justify-end':'justify-start'} animate-fade-in`}>
@@ -102,11 +105,15 @@ export default function AIPage() {
                     <Sparkles size={14} className="text-violet-600"/>
                   </div>
                 )}
-              <div 
-                className={m.role==='user'?'chat-bubble-user':'chat-bubble-ai'}
-                dangerouslySetInnerHTML={{__html: formatMsg(m.content)}}
-              />
+                {/* ✅ Fixed: No comments inside tag */}
+                <div 
+                  className={m.role==='user'?'chat-bubble-user':'chat-bubble-ai'}
+                  dangerouslySetInnerHTML={{__html: formatMsg(m.content)}}
+                />
+              </div>
             ))}
+            
+            {/* Loading Indicator */}
             {loading && (
               <div className="flex items-start gap-2">
                 <div className="w-8 h-8 bg-violet-100 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -120,7 +127,7 @@ export default function AIPage() {
             <div ref={bottomRef}/>
           </div>
 
-          {/* Quick actions */}
+          {/* Quick Actions */}
           <div className="px-4 pb-2 max-w-2xl mx-auto w-full">
             <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
               {QUICK.map((q,i) => (
@@ -132,20 +139,28 @@ export default function AIPage() {
             </div>
           </div>
 
-          {/* Input */}
+          {/* Input Area */}
           <div className="px-4 pb-safe max-w-2xl mx-auto w-full">
             <div className="flex items-center gap-2 bg-[var(--surface)] border border-[var(--border)] rounded-2xl px-3 py-2 focus-within:border-brand transition-all">
-              <input className="flex-1 bg-transparent text-sm text-[var(--text)] placeholder-[var(--muted)] focus:outline-none py-1"
-                placeholder="Ask about your trip…" value={input} onChange={e=>setInput(e.target.value)}
-                onKeyDown={e=>e.key==='Enter'&&!loading&&send()}/>
-              <button onClick={() => send()} disabled={!input.trim()||loading}
-                className="w-9 h-9 bg-brand text-white rounded-xl flex items-center justify-center disabled:opacity-40 active:scale-90 transition-all flex-shrink-0">
+              <input 
+                className="flex-1 bg-transparent text-sm text-[var(--text)] placeholder-[var(--muted)] focus:outline-none py-1"
+                placeholder="Ask about your trip…" 
+                value={input} 
+                onChange={e=>setInput(e.target.value)}
+                onKeyDown={e=>e.key==='Enter'&&!loading&&send()}
+              />
+              <button 
+                onClick={() => send()} 
+                disabled={!input.trim()||loading}
+                className="w-9 h-9 bg-brand text-white rounded-xl flex items-center justify-center disabled:opacity-40 active:scale-90 transition-all flex-shrink-0"
+              >
                 <Send size={15}/>
               </button>
             </div>
           </div>
         </>
       ) : (
+        /* Budget Tab */
         <div className="flex-1 overflow-y-auto px-4 py-4 max-w-2xl mx-auto w-full">
           {loadingBudget ? (
             <div className="flex flex-col items-center pt-16 gap-3">
