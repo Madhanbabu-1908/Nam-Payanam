@@ -4,19 +4,22 @@ import { supabaseAdmin } from "../config/db";
 const createCheckin = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
-    const { tripId, location } = req.body;
+    
+    // 1. Destructure fields matching Frontend CheckinPage.tsx
+    const { tripId, locationName, latitude, longitude, icon, note } = req.body;
 
     if (!userId) {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
 
-    if (!tripId || !location) {
+    if (!tripId || !locationName) {
       return res.status(400).json({
         success: false,
-        message: "Trip ID and location are required",
+        message: "Trip ID and Location Name are required",
       });
     }
 
+    // 2. Verify user is a member of the trip
     const { data: member } = await supabaseAdmin
       .from("trip_members")
       .select("id")
@@ -31,60 +34,71 @@ const createCheckin = async (req: Request, res: Response) => {
       });
     }
 
+    // 3. Insert into Database
+    // ⚠️ MATCHING YOUR SCHEMA EXACTLY: latitude, longitude, location_name
     const { error } = await supabaseAdmin.from("checkins").insert({
       trip_id: tripId,
       user_id: userId,
-      location,
-      created_at: new Date().toISOString(),
+      location_name: locationName, 
+      latitude: latitude,               
+      longitude: longitude,             
+      icon: icon || 'PIN',         
+      note: note,                  
+      status: 'WAITING',           
+      checked_in_at: new Date().toISOString(), // Matches your schema column name
     });
 
-    if (error) throw error;
+    if (error) {
+      console.error("Supabase Insert Error:", error);
+      throw error;
+    }
 
     return res.json({ success: true, message: "Check-in created" });
   } catch (err: any) {
+    console.error("❌ Create Checkin Error:", err);
     return res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// 🔥 NEW: get all checkins for a trip
 const getCheckins = async (req: Request, res: Response) => {
   try {
     const { tripId } = req.params;
-
     const { data, error } = await supabaseAdmin
       .from("checkins")
       .select("*")
       .eq("trip_id", tripId)
-      .order("created_at", { ascending: false });
+      .order("checked_in_at", { ascending: false }); // Use checked_in_at for sorting
 
     if (error) throw error;
-
-    return res.json({ success: true, data });
+    return res.json({ success: true,  data });
   } catch (err: any) {
     return res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// 🔥 NEW: update status
 const updateStatus = async (req: Request, res: Response) => {
   try {
     const { checkinId } = req.params;
     const { status } = req.body;
+    
+    // Validate status against your DB constraint
+    const validStatuses = ['WAITING', 'PICKED_UP', 'ARRIVED'];
+    if (!validStatuses.includes(status)) {
+       return res.status(400).json({ success: false, message: "Invalid status" });
+    }
 
     const { error } = await supabaseAdmin
       .from("checkins")
       .update({ status })
       .eq("id", checkinId);
-
+      
     if (error) throw error;
-
     return res.json({ success: true, message: "Status updated" });
   } catch (err: any) {
     return res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// ✅ EXPORT FIX
 export const checkinController = {
   createCheckin,
   getCheckins,
