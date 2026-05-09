@@ -56,18 +56,22 @@ export const tripController = {
       const tripCode = Math.random().toString(36).substring(2, 8).toUpperCase();
 
       // 2. Prepare Data with Safe Defaults
+           // 2. Prepare Data with Safe Defaults (Use undefined instead of null)
       const tripData = {
         organizer_id: userId,
         name,
         destination,
         start_location,
-        destination_lat: destination_lat ? Number(destination_lat) : null,
-        destination_lng: destination_lng ? Number(destination_lng) : null,
-        start_lat: start_lat ? Number(start_lat) : null,
-        start_lng: start_lng ? Number(start_lng) : null,
+        // Use undefined if the value is missing, not null
+        destination_lat: destination_lat ? Number(destination_lat) : undefined,
+        destination_lng: destination_lng ? Number(destination_lng) : undefined,
+        start_lat: start_lat ? Number(start_lat) : undefined,
+        start_lng: start_lng ? Number(start_lng) : undefined,
+        
         route: routeCoords.length > 0
           ? { type: "LineString", coordinates: routeCoords }
-          : null,
+          : undefined, // Use undefined here too if route is optional
+        
         start_date,
         end_date,
         budget: budget ? Number(budget) : 0,
