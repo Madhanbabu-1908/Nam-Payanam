@@ -2,7 +2,12 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import SpriteLoader from './SpriteLoader';
 
-export default function VehicleLoader() {
+// Define props interface to accept optional message for compatibility
+interface VehicleLoaderProps {
+  message?: string; 
+}
+
+export default function VehicleLoader({ message }: VehicleLoaderProps) {
   return (
     // Full Screen Container
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f172a] overflow-hidden w-full h-full">
@@ -18,6 +23,12 @@ export default function VehicleLoader() {
       <div className="absolute inset-0 z-0">
         <SpriteLoader fps={12} color="#3b82f6" />
       </div>
+
+      {/* 
+         Note: Text and Progress Bar are intentionally removed 
+         as per your request for a clean, full-screen animation.
+         The 'message' prop is accepted but not used in the UI.
+      */}
 
     </div>
   );
