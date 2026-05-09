@@ -57,7 +57,7 @@ export const tripController = {
 
       // 2. Prepare Data with Safe Defaults
            // 2. Prepare Data with Safe Defaults (Use undefined instead of null)
-      const tripData = {
+           const tripData = {
         organizer_id: userId,
         name,
         destination,
@@ -69,14 +69,14 @@ export const tripController = {
         start_lng: start_lng ? Number(start_lng) : undefined,
         
         route: routeCoords.length > 0
-          ? { type: "LineString" as const, coordinates: routeCoords } // Add 'as const' here
-          : undefined, // Use undefined here too if route is optional
+          ? { type: "LineString" as const, coordinates: routeCoords } 
+          : undefined, 
         
         start_date,
         end_date,
         budget: budget ? Number(budget) : 0,
         mode: mode || 'MANUAL',
-        status: 'PLANNING',
+        status: 'PLANNING' as const, // <--- ADD 'as const' HERE
         trip_code: tripCode,
       };
 
