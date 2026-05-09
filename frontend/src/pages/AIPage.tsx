@@ -12,7 +12,7 @@ const QUICK = [
   { icon:'🚨', label:'Emergency info', q:'What are key hospitals, police stations, and emergency contacts along this route?' },
 ];
 
-// ✅ Safe formatter
+// ✅ Safe formatter for markdown-like text
 function formatMsg(t: string | undefined | null) {
   if (!t) return '';
   return t.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
@@ -31,38 +31,67 @@ export default function AIPage() {
   const [tab, setTab]           = useState<'chat'|'budget'>('chat');
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  // Load Chat History
   useEffect(() => {
     api.get(`/ai/trips/${tripId}/chat`).then(r => {
+      // Backend returns { success: true, data: [...] }
       setMessages(r.data.data || []);
     }).catch(() => {
-      setMessages([{ role:'assistant', content:'Vanakkam! 🙏 I\'m your Nam Payanam AI companion.', created_at: new Date() }]);
+      setMessages([{ 
+        role:'assistant', 
+        content:'Vanakkam! 🙏 I\'m your Nam Payanam AI companion.\n\nAsk me anything about your trip — food stops, hotels, costs, safety tips, or local secrets!', 
+        created_at: new Date() 
+      }]);
     });
   }, [tripId]);
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({behavior:'smooth'}); }, [messages]);
+  // Auto-scroll to bottom
+  useEffect(() => { 
+    bottomRef.current?.scrollIntoView({behavior:'smooth'}); 
+  }, [messages]);
 
   const send = async (text?: string) => {
     const msg = text || input.trim();
     if (!msg || loading) return;
+    
     setInput('');
     setMessages(p => [...p, { role:'user', content:msg }]);
     setLoading(true);
+    
     try {
       const res = await api.post(`/ai/trips/${tripId}/chat`, { message: msg });
-      const aiResponse = res.data.data?.response || 'No response received.';
+      
+      // ✅ FIX: Correctly parse the response based on backend structure
+      // Backend sends: { success: true, data: "The AI response string" }
+      let aiResponse = '';
+      if (typeof res.data.data === 'string') {
+        aiResponse = res.data.data;
+      } else if (res.data.data?.response) {
+        aiResponse = res.data.data.response;
+      } else {
+        aiResponse = 'No response received.';
+      }
+
       setMessages(p => [...p, { role:'assistant', content: aiResponse }]);
-    } catch {
+    } catch (err) {
+      console.error(err);
       setMessages(p => [...p, { role:'assistant', content:'⚠️ I had trouble responding. Please try again.' }]);
-    } finally { setLoading(false); }
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const loadBudget = async () => {
     setLB(true);
     try {
       const r = await api.get(`/ai/trips/${tripId}/budget`);
+      // Backend sends: { success: true, data: { breakdown: {...}, tips: [...] } }
       setBudget(r.data.data);
-    } catch { alert('Failed to analyze budget'); }
-    finally { setLB(false); }
+    } catch { 
+      alert('Failed to analyze budget'); 
+    } finally { 
+      setLB(false); 
+    }
   };
 
   return (
@@ -105,7 +134,6 @@ export default function AIPage() {
                     <Sparkles size={14} className="text-violet-600"/>
                   </div>
                 )}
-                {/* ✅ Fixed: No comments inside tag */}
                 <div 
                   className={m.role==='user'?'chat-bubble-user':'chat-bubble-ai'}
                   dangerouslySetInnerHTML={{__html: formatMsg(m.content)}}
