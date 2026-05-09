@@ -54,12 +54,12 @@ export default function VehicleLoader({ message }: VehicleLoaderProps) {
       {/* 2. Main Content Wrapper - Centers everything vertically and horizontally */}
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen w-full px-4 py-8">
         
-        {/* Icon Container */}
-        <div className="relative mb-12 scale-100 md:scale-125 transition-transform duration-500">
+        {/* Icon Container - Full Width */}
+        <div className="relative w-full max-w-4xl mb-12">
           
           {/* Main SVG Group with Hover Animation */}
           <motion.div 
-            className="relative"
+            className="relative w-full aspect-video"
             // Gentle Hover Animation
             animate={{ y: [0, -5, 0] }}
             transition={{ y: { duration: 2, repeat: Infinity, ease: "easeInOut" } }}
@@ -67,6 +67,7 @@ export default function VehicleLoader({ message }: VehicleLoaderProps) {
             
             {/* Inner Group for Engine Vibration */}
             <motion.div
+              className="w-full h-full"
               animate={{ 
                 x: [0, -0.5, 0.5, -0.5, 0], 
                 y: [0, 0.5, -0.5, 0.5, 0] 
@@ -77,7 +78,6 @@ export default function VehicleLoader({ message }: VehicleLoaderProps) {
               }}
             >
               {/* Use the Sprite Loader here */}
-              {/* The SpriteLoader itself handles its own size (220x140), so it will center nicely */}
               <SpriteLoader fps={12} color="#3b82f6" />
               
             </motion.div>
