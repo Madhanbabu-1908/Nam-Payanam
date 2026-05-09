@@ -1,14 +1,17 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 
 interface SpriteLoaderProps {
-  fps?: number;
-  color?: string;
+  fps?: number; // Frames per second (Default 12 for smooth line art)
+  color?: string; 
 }
 
 export default function SpriteLoader({ fps = 12, color = "#3b82f6" }: SpriteLoaderProps) {
   const [currentFrameIndex, setCurrentFrameIndex] = useState(0);
   const [frames, setFrames] = useState<string[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+  
+  // Ref to store the timer ID for cleanup
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // 1. Dynamically import ALL SVGs
   // IMPORTANT: Ensure this path matches your actual folder structure
@@ -30,6 +33,7 @@ export default function SpriteLoader({ fps = 12, color = "#3b82f6" }: SpriteLoad
       return numA - numB;
     });
     
+    console.log(`✅ Loaded ${sortedEntries.length} frames.`);
     return sortedEntries.map(([_, url]) => url as string);
   }, []);
 
@@ -40,35 +44,51 @@ export default function SpriteLoader({ fps = 12, color = "#3b82f6" }: SpriteLoad
     let loadedCount = 0;
     const totalImages = sortedUrls.length;
 
+    // Helper to handle load completion
+    const onImageLoad = () => {
+      loadedCount++;
+      if (loadedCount === totalImages) {
+        setIsLoaded(true);
+      }
+    };
+
+    // Start preloading
     sortedUrls.forEach((url) => {
       const img = new Image();
       img.src = url;
-      img.onload = () => {
-        loadedCount++;
-        if (loadedCount === totalImages) {
-          setIsLoaded(true);
-        }
-      };
+      
+      // Handle successful load
+      img.onload = onImageLoad;
+      
+      // Handle error (still count it so we don't hang forever)
       img.onerror = () => {
-        console.error(`Failed to preload image: ${url}`);
-        loadedCount++; 
-        if (loadedCount === totalImages) {
-          setIsLoaded(true);
-        }
+        console.warn(`⚠️ Failed to preload frame: ${url}`);
+        onImageLoad();
       };
     });
   }, [sortedUrls]);
 
   // 4. Animation Loop
   useEffect(() => {
+    // Only start animation if all frames are loaded
     if (!isLoaded || frames.length === 0) return;
 
+    // Calculate interval time based on FPS
     const intervalTime = 1000 / fps;
-    const timer = setInterval(() => {
-      setCurrentFrameIndex((prev) => (prev + 1) % frames.length);
+
+    timerRef.current = setInterval(() => {
+      setCurrentFrameIndex((prev) => {
+        // Cycle through frames: 0 -> 1 -> 2 ... -> last -> 0
+        return (prev + 1) % frames.length;
+      });
     }, intervalTime);
 
-    return () => clearInterval(timer);
+    // Cleanup on unmount
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
   }, [frames.length, fps, isLoaded]);
 
   // Update frames state once preloading is done
