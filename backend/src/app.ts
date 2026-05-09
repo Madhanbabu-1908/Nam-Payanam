@@ -10,30 +10,34 @@ import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
 
-// ✅ CRITICAL: Trust the first proxy (Render) to get correct client IP for rate limiting
+// ✅ CRITICAL: Trust the first proxy (Render) to get correct client IP
 app.set('trust proxy', 1);
 
 // 1. Security Middleware
-// Helmet helps secure Express apps by setting various HTTP headers.
 app.use(helmet({
-  crossOriginEmbedderPolicy: false, // Often needed for frontend assets
-  contentSecurityPolicy: false,     // Disabled to prevent conflicts with API responses during dev
+  crossOriginEmbedderPolicy: false,
+  contentSecurityPolicy: false, 
 }));
 
-// 2. CORS Configuration - STRICT
-// Only allow requests from your specific Vercel domain and localhost
-const allowedOrigins = [
-  'http://localhost:3000', 
-  'http://localhost:5173', 
-  'https://nam-payanam.vercel.app' // YOUR PRODUCTION DOMAIN
-];
-
+// 2. CORS Configuration - DYNAMIC VERCEL SUPPORT
 app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl/postman)
     if (!origin) return callback(null, true);
+
+    // Define your strict production domain
+    const productionDomain = 'https://nam-payanam.vercel.app';
     
-    if (allowedOrigins.indexOf(origin) !== -1) {
+    // Check if the request comes from:
+    // 1. Localhost (for development)
+    // 2. Your exact production domain
+    // 3. ANY vercel.app subdomain (for Preview Deployments)
+    const isAllowed = 
+      origin.startsWith('http://localhost') || 
+      origin === productionDomain || 
+      origin.endsWith('.vercel.app');
+
+    if (isAllowed) {
       callback(null, true);
     } else {
       console.warn(`❌ CORS Blocked Origin: ${origin}`);
@@ -41,32 +45,32 @@ app.use(cors({
     }
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  credentials: true, // Required for sending cookies/auth headers
-  optionsSuccessStatus: 200 // Some legacy browsers choke on 204
+  credentials: true, // Keep TRUE for Auth/Cookies
+  optionsSuccessStatus: 200
 }));
 
 // 3. Request Logging
 if (env.NODE_ENV !== 'production') {
-  app.use(morgan('dev')); // Concise output for development
+  app.use(morgan('dev'));
 } else {
-  app.use(morgan('combined')); // Standard Apache combined log format for production
+  app.use(morgan('combined'));
 }
 
 // 4. Body Parsing
-app.use(express.json({ limit: '10mb' })); // Increased limit for larger payloads (e.g., AI responses)
+app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// 5. Rate Limiting (Prevent DDoS/Brute Force)
+// 5. Rate Limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
+  max: 100, 
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
 });
 app.use('/api', limiter);
 
-// 6. Health Check Endpoint
+// 6. Health Check
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'ok', 
@@ -77,10 +81,9 @@ app.get('/health', (req, res) => {
 });
 
 // 7. API Routes
-// All routes are prefixed with /api
 app.use('/api', routes);
 
-// 8. 404 Handler (If no route matches)
+// 8. 404 Handler
 app.use((req, res) => {
   res.status(404).json({
     success: false,
@@ -90,7 +93,6 @@ app.use((req, res) => {
 });
 
 // 9. Global Error Handler
-// Catches all errors from controllers and middleware
 app.use(errorHandler);
 
 export default app;
