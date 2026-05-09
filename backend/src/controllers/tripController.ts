@@ -69,7 +69,7 @@ export const tripController = {
         start_lng: start_lng ? Number(start_lng) : undefined,
         
         route: routeCoords.length > 0
-          ? { type: "LineString", coordinates: routeCoords }
+          ? { type: "LineString" as const, coordinates: routeCoords } // Add 'as const' here
           : undefined, // Use undefined here too if route is optional
         
         start_date,
