@@ -9,9 +9,9 @@ export default function SpriteLoader({ fps = 12, color = "#3b82f6" }: SpriteLoad
   const [currentFrameIndex, setCurrentFrameIndex] = useState(0);
   const [frames, setFrames] = useState<string[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // 1. Dynamically import ALL SVGs
+  // IMPORTANT: Ensure this path matches your actual folder structure
   const svgModules = import.meta.glob('../../assets/frames/*.svg', { 
     eager: true, 
     as: 'url' 
@@ -19,11 +19,7 @@ export default function SpriteLoader({ fps = 12, color = "#3b82f6" }: SpriteLoad
 
   // 2. Sort and Prepare URLs
   const sortedUrls = useMemo(() => {
-    if (!svgModules || Object.keys(svgModules).length === 0) {
-      console.error("❌ No SVGs found in ../../assets/frames/");
-      setError("No SVGs found.");
-      return [];
-    }
+    if (!svgModules || Object.keys(svgModules).length === 0) return [];
     
     const entries = Object.entries(svgModules);
     
@@ -85,30 +81,24 @@ export default function SpriteLoader({ fps = 12, color = "#3b82f6" }: SpriteLoad
   // --- LOADING STATE (Skeleton Pulse) ---
   if (!isLoaded || frames.length === 0) {
     return (
-      <div className="relative w-full h-full flex items-center justify-center">
+      <div className="relative w-full h-full flex items-center justify-center bg-[#0f172a]">
         {/* Skeleton Box */}
-        <div className="w-96 h-56 bg-slate-800/50 rounded-xl animate-pulse border border-slate-700/50" />
-        
-        {/* Optional: Subtle Glow behind skeleton */}
-        <div className="absolute inset-0 bg-blue-500/10 blur-xl rounded-xl animate-pulse" />
+        <div className="w-64 h-40 bg-slate-800/50 rounded-xl animate-pulse border border-slate-700/50" />
       </div>
     );
   }
 
-  // --- ERROR STATE ---
-  if (error) {
-    return <div className="w-full h-full" />; 
-  }
-
-  // --- ANIMATION STATE ---
+  // --- ANIMATION STATE (FULL SCREEN) ---
   return (
     <div className="relative w-full h-full overflow-hidden">
       <img
         src={frames[currentFrameIndex]}
         alt="Plane Animation"
-        className="w-full h-full object-cover drop-shadow-[0_0_15px_rgba(59,130,246,0.5)] transition-opacity duration-75"
+        // object-cover ensures it fills the screen. 
+        // If you want to see the whole plane even if it leaves empty space, use 'object-contain'
+        className="w-full h-full object-cover drop-shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-opacity duration-75"
         style={{ 
-          filter: `drop-shadow(0 0 5px ${color})`,
+          filter: `drop-shadow(0 0 10px ${color})`,
         }}
       />
     </div>
