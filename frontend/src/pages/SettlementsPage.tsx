@@ -4,14 +4,17 @@ import { api } from "../config/api";
 import { motion } from "framer-motion";
 
 type Member = {
-  _id: string;
-  name: string;
-  nickname?: string;
+  user_id: string; // ✅ Match backend response field
+  profiles?: {
+    full_name: string;
+    email: string;
+  };
 };
 
 type Expense = {
+  id: string;
   amount: number;
-  paidBy: string;
+  paid_by_user_id: string; // ✅ Match backend response field
 };
 
 export default function SettlementPage() {
@@ -26,7 +29,8 @@ export default function SettlementPage() {
     const fetchData = async () => {
       try {
         const [membersRes, expensesRes] = await Promise.all([
-          api.get(`/trip/${tripId}/members`),
+          // ✅ FIX: Changed /trip/ to /trips/
+          api.get(`/trips/${tripId}/members`), 
           api.get(`/expenses/${tripId}`),
         ]);
 
@@ -46,22 +50,27 @@ export default function SettlementPage() {
   const calculate = () => {
     if (!members.length) return [];
 
-    const total = expenses.reduce((sum, e) => sum + e.amount, 0);
+    const total = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
     const split = total / members.length;
 
     const balances: any = {};
 
+    // Initialize balances
     members.forEach((m) => {
-      balances[m._id] = -split;
+      balances[m.user_id] = -split;
     });
 
+    // Add payments
     expenses.forEach((e) => {
-      balances[e.paidBy] += e.amount;
+      if (balances[e.paid_by_user_id] !== undefined) {
+        balances[e.paid_by_user_id] += e.amount;
+      }
     });
 
     return members.map((m) => ({
-      name: m.nickname || m.name || "User", // 🔥 FIX nickname
-      balance: balances[m._id] || 0,
+      // ✅ Use profiles.full_name from backend response
+      name: m.profiles?.full_name || m.profiles?.email?.split('@')[0] || "User", 
+      balance: balances[m.user_id] || 0,
     }));
   };
 
