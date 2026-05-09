@@ -6,8 +6,8 @@ import { requireOrganizer } from '../middleware/roleMiddleware';
 const router = Router();
 router.use(authMiddleware);
 
-// GET /api/itinerary/trip/:tripId
-router.get('/trips/:tripId', itineraryController.getItineraryByTrip);
+// ✅ CHANGE THIS LINE: Use /:tripId to match frontend /api/itinerary/:id
+router.get('/:tripId', itineraryController.getItineraryByTrip);
 
 // POST /api/itinerary/:tripId (Add Stop)
 router.post('/:tripId', requireOrganizer, itineraryController.addStop);
