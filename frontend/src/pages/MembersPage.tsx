@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../config/api';
+import { tripService } from '../services/tripService'; // ✅ Import service
 import { useAuth } from '../context/AuthContext';
 import { ArrowLeft, Copy, Check, Crown, User, X, Hash, Link2 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -19,18 +20,25 @@ export default function MembersPage() {
   const load = async () => {
     if (!tripId) return;
     try {
+      // ✅ Use tripService for consistency
       const [tripRes, memRes] = await Promise.all([
-        api.get(`/trips/${tripId}`),
-        api.get(`/trips/${tripId}/members`).catch(() => ({ data: { data: [] } })),
+        tripService.getById(tripId),
+        tripService.getMembers(tripId).catch(() => ({ data: { data: [] } })),
       ]);
+      
       const t = tripRes.data.data;
       setTrip(t);
       setIsOrg(t.organizer_id === user?.id);
 
       const rawMembers = memRes.data.data || [];
-      // Add organizer if not in list
+      
+      // Add organizer if not in list (fallback for UI)
       if (!rawMembers.find((m: any) => m.user_id === t.organizer_id)) {
-        rawMembers.unshift({ user_id: t.organizer_id, role: 'ORGANIZER', profile: { email: user?.email, full_name: user?.user_metadata?.full_name } });
+        rawMembers.unshift({ 
+          user_id: t.organizer_id, 
+          role: 'ORGANIZER', 
+          profiles: { email: user?.email, full_name: user?.user_metadata?.full_name } 
+        });
       }
       setMembers(rawMembers);
     } catch (e) { console.error(e); }
@@ -42,6 +50,7 @@ export default function MembersPage() {
   const removeMember = async (memberId: string) => {
     if (!confirm('Remove this member from the trip?')) return;
     try {
+      // ✅ Ensure this endpoint exists in backend or use a different method
       await api.delete(`/trips/${tripId}/members/${memberId}`);
       setMembers(m => m.filter(x => x.user_id !== memberId));
       toast.success('Member removed');
@@ -54,7 +63,7 @@ export default function MembersPage() {
   const copyLink = () => { navigator.clipboard.writeText(inviteLink); setCopiedLink(true); toast.success('Invite link copied!'); setTimeout(() => setCopiedLink(false), 2000); };
   const copyCode = () => { navigator.clipboard.writeText(tripCode); setCopiedCode(true); toast.success('Trip code copied!'); setTimeout(() => setCopiedCode(false), 2000); };
 
-  const getName = (m: any) => m.profile?.full_name || m.profile?.email?.split('@')[0] || m.user_id?.substring(0, 8);
+  const getName = (m: any) => m.profiles?.full_name || m.profiles?.email?.split('@')[0] || m.user_id?.substring(0, 8);
 
   return (
     <div className="page pt-safe">
@@ -118,7 +127,7 @@ export default function MembersPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-bold text-[var(--text)] text-sm">{name}</p>
-                      <p className="text-[var(--muted)] text-xs truncate">{m.profile?.email || ''}</p>
+                      <p className="text-[var(--muted)] text-xs truncate">{m.profiles?.email || ''}</p>
                     </div>
                     {isHost && <span className="badge badge-brand">Host</span>}
                     {isOrg && !isHost && !isMe && (
