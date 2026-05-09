@@ -1,17 +1,19 @@
 import { useEffect, useState, useMemo } from 'react';
 
 interface SpriteLoaderProps {
-  fps?: number; // Frames per second
-  color?: string; 
+  fps?: number;
+  color?: string;
 }
 
 export default function SpriteLoader({ fps = 12, color = "#3b82f6" }: SpriteLoaderProps) {
   const [currentFrameIndex, setCurrentFrameIndex] = useState(0);
   const [frames, setFrames] = useState<string[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // 1. Dynamically import ALL SVGs
-  // Note: Ensure this path matches your actual folder structure
+  // IMPORTANT: Ensure this path matches your actual folder structure
+  // If your folder is named 'plane-frames', change 'frames' to 'plane-frames' below
   const svgModules = import.meta.glob('../../assets/frames/*.svg', { 
     eager: true, 
     as: 'url' 
@@ -19,7 +21,11 @@ export default function SpriteLoader({ fps = 12, color = "#3b82f6" }: SpriteLoad
 
   // 2. Sort and Prepare URLs
   const sortedUrls = useMemo(() => {
-    if (!svgModules || Object.keys(svgModules).length === 0) return [];
+    if (!svgModules || Object.keys(svgModules).length === 0) {
+      console.error("❌ No SVGs found in ../../assets/frames/");
+      setError("No SVGs found.");
+      return [];
+    }
     
     const entries = Object.entries(svgModules);
     
@@ -51,7 +57,7 @@ export default function SpriteLoader({ fps = 12, color = "#3b82f6" }: SpriteLoad
       };
       img.onerror = () => {
         console.error(`Failed to preload image: ${url}`);
-        loadedCount++; // Count it anyway to avoid infinite hang
+        loadedCount++; 
         if (loadedCount === totalImages) {
           setIsLoaded(true);
         }
@@ -78,22 +84,28 @@ export default function SpriteLoader({ fps = 12, color = "#3b82f6" }: SpriteLoad
     }
   }, [isLoaded, sortedUrls]);
 
-  // Loading State
+  // --- LOADING STATE (Skeleton Pulse) ---
   if (!isLoaded || frames.length === 0) {
     return (
-      <div className="w-[220px] h-[140px] bg-slate-800/50 rounded-lg animate-pulse flex items-center justify-center">
-        <span className="text-xs text-slate-500">Loading Assets...</span>
+      <div className="relative w-[220px] h-[140px] flex items-center justify-center">
+        {/* Skeleton Box */}
+        <div className="w-full h-full bg-slate-800/50 rounded-xl animate-pulse border border-slate-700/50" />
+        
+        {/* Optional: Subtle Glow behind skeleton */}
+        <div className="absolute inset-0 bg-blue-500/10 blur-xl rounded-xl animate-pulse" />
       </div>
     );
   }
 
+  // --- ERROR STATE ---
+  if (error) {
+    // Silent fail or minimal indicator if preferred
+    return <div className="w-[220px] h-[140px]" />; 
+  }
+
+  // --- ANIMATION STATE ---
   return (
     <div className="relative w-[220px] h-[140px] overflow-hidden">
-      {/* 
-         SINGLE IMG TAG WITHOUT KEY.
-         This prevents React from unmounting/remounting the element.
-         We simply swap the src attribute.
-      */}
       <img
         src={frames[currentFrameIndex]}
         alt="Plane Animation"
