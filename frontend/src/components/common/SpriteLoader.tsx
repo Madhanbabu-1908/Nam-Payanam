@@ -12,8 +12,6 @@ export default function SpriteLoader({ fps = 12, color = "#3b82f6" }: SpriteLoad
   const [error, setError] = useState<string | null>(null);
 
   // 1. Dynamically import ALL SVGs
-  // IMPORTANT: Ensure this path matches your actual folder structure
-  // If your folder is named 'plane-frames', change 'frames' to 'plane-frames' below
   const svgModules = import.meta.glob('../../assets/frames/*.svg', { 
     eager: true, 
     as: 'url' 
@@ -87,9 +85,9 @@ export default function SpriteLoader({ fps = 12, color = "#3b82f6" }: SpriteLoad
   // --- LOADING STATE (Skeleton Pulse) ---
   if (!isLoaded || frames.length === 0) {
     return (
-      <div className="relative w-[220px] h-[140px] flex items-center justify-center">
+      <div className="relative w-full h-full flex items-center justify-center">
         {/* Skeleton Box */}
-        <div className="w-full h-full bg-slate-800/50 rounded-xl animate-pulse border border-slate-700/50" />
+        <div className="w-96 h-56 bg-slate-800/50 rounded-xl animate-pulse border border-slate-700/50" />
         
         {/* Optional: Subtle Glow behind skeleton */}
         <div className="absolute inset-0 bg-blue-500/10 blur-xl rounded-xl animate-pulse" />
@@ -99,17 +97,16 @@ export default function SpriteLoader({ fps = 12, color = "#3b82f6" }: SpriteLoad
 
   // --- ERROR STATE ---
   if (error) {
-    // Silent fail or minimal indicator if preferred
-    return <div className="w-[220px] h-[140px]" />; 
+    return <div className="w-full h-full" />; 
   }
 
   // --- ANIMATION STATE ---
   return (
-    <div className="relative w-[220px] h-[140px] overflow-hidden">
+    <div className="relative w-full h-full overflow-hidden">
       <img
         src={frames[currentFrameIndex]}
         alt="Plane Animation"
-        className="w-full h-full object-contain drop-shadow-[0_0_15px_rgba(59,130,246,0.5)] transition-opacity duration-75"
+        className="w-full h-full object-cover drop-shadow-[0_0_15px_rgba(59,130,246,0.5)] transition-opacity duration-75"
         style={{ 
           filter: `drop-shadow(0 0 5px ${color})`,
         }}
