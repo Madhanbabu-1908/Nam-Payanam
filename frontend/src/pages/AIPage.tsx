@@ -102,10 +102,10 @@ export default function AIPage() {
                     <Sparkles size={14} className="text-violet-600"/>
                   </div>
                 )}
-                <div className={m.role==='user'?'chat-bubble-user':'chat-bubble-ai'}
-                  {/* ✅ FIX: Pass m.content safely to formatMsg */}
-                  dangerouslySetInnerHTML={{__html: formatMsg(m.content)}}/>
-              </div>
+              <div 
+                className={m.role==='user'?'chat-bubble-user':'chat-bubble-ai'}
+                dangerouslySetInnerHTML={{__html: formatMsg(m.content)}}
+              />
             ))}
             {loading && (
               <div className="flex items-start gap-2">
