@@ -13,7 +13,7 @@ export default function SpriteLoader({ fps = 12, color = "#3b82f6" }: SpriteLoad
 
   // 1. Dynamically import ALL SVGs in the folder
   // IMPORTANT: Ensure the path matches your actual folder structure
-  const svgModules = import.meta.glob('../../assets/plane-frames/*.svg', { 
+  const svgModules = import.meta.glob('../../assets/frames/*.svg', { 
     eager: true, 
     as: 'url' 
   });
