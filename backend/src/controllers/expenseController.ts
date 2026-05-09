@@ -55,9 +55,11 @@ export const expenseController = {
   getExpenses: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { tripId } = req.params;
+      // ✅ FIXED: Don't try to join 'paid_by_user_id' - just get expenses and splits
       const { data, error } = await supabaseAdmin.from('expenses')
-        .select('*, expense_splits(*), paid_by:paid_by_user_id (email)')
-        .eq('trip_id', tripId).order('date', { ascending: false });
+        .select('*, expense_splits(*)')
+        .eq('trip_id', tripId)
+        .order('date', { ascending: false });
       if (error) throw error;
       res.json({ success: true, data });
     } catch (err: any) { next(err); }
