@@ -4,117 +4,152 @@ import { useEffect, useState } from "react";
 interface VehicleLoaderProps {
   message?: string;
   onComplete?: () => void;
-  speed?: number;
+  duration?: number; // Total loading time in ms
 }
 
-export default function VehicleLoader({ message, onComplete, speed = 1 }: VehicleLoaderProps) {
+export default function VehicleLoader({ message, onComplete, duration = 4000 }: VehicleLoaderProps) {
   const [progress, setProgress] = useState(0);
-  const [dots, setDots] = useState("");
+  const [mounted, setMounted] = useState(false);
 
-  // Simulate loading progress
   useEffect(() => {
-    const duration = 5000 / speed; // Total load time
-    const intervalTime = 50;
-    const increment = 100 / (duration / intervalTime);
+    setMounted(true);
+    const startTime = Date.now();
+    
+    const animate = () => {
+      const now = Date.now();
+      const elapsed = now - startTime;
+      const nextProgress = Math.min((elapsed / duration) * 100, 100);
+      
+      setProgress(nextProgress);
 
-    const timer = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(timer);
-          setTimeout(() => onComplete?.(), 500);
-          return 100;
-        }
-        return prev + increment;
-      });
-    }, intervalTime);
+      if (nextProgress < 100) {
+        requestAnimationFrame(animate);
+      } else {
+        setTimeout(() => onComplete?.(), 800);
+      }
+    };
 
-    return () => clearInterval(timer);
-  }, [onComplete, speed]);
+    requestAnimationFrame(animate);
+  }, [duration, onComplete]);
 
-  // Animate the "..." dots
-  useEffect(() => {
-    const dotTimer = setInterval(() => {
-      setDots((prev) => (prev.length >= 3 ? "" : prev + "."));
-    }, 400);
-    return () => clearInterval(dotTimer);
-  }, []);
-
-  // Generate 12 bars for the radial loader
-  const bars = Array.from({ length: 12 });
+  // Generate 12 bars
+  const totalBars = 12;
+  const bars = Array.from({ length: totalBars });
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#faf8f2] overflow-hidden">
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#FAFAF9] overflow-hidden selection:bg-none">
       
-      {/* Optional: Very subtle paper texture (kept minimal) */}
-      <div 
-        className="absolute inset-0 opacity-[0.03] pointer-events-none"
-        style={{ 
-          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")` 
-        }} 
-      />
+      {/* Subtle Ambient Background Glow */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-orange-50/50 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="relative z-10 flex flex-col items-center">
+      <div className="relative z-10 flex flex-col items-center gap-10">
         
-        {/* --- THE RADIAL LOADER --- */}
-        <div className="relative w-24 h-24 mb-8">
-          {/* Rotating Container */}
+        {/* --- THE LOADER RING --- */}
+        <div className="relative w-28 h-28">
+          {/* 
+            We use a single rotating container for smoothness.
+            The 'animate' prop handles the continuous rotation.
+          */}
           <motion.div
-            className="w-full h-full"
+            className="w-full h-full relative"
             animate={{ rotate: 360 }}
-            transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
+            transition={{ 
+              duration: 1.5, 
+              repeat: Infinity, 
+              ease: "linear",
+              type: "tween" 
+            }}
           >
             {bars.map((_, i) => {
-              // Calculate opacity gradient: Darker at top, lighter at bottom
-              // We offset the index so the darkest bar is at the top (12 o'clock)
-              const offsetIndex = (i + 3) % 12; 
-              const opacity = 0.15 + (offsetIndex / 12) * 0.85; // Range from 0.15 to 1.0
+              // Calculate opacity gradient
+              // We want the bar at the top (index 0 after rotation offset) to be darkest
+              // and the one at the bottom to be lightest.
+              // Since the container rotates, we staticly assign opacities that create a trail.
+              const normalizedIndex = (i + 9) % totalBars; 
+              const opacity = 0.1 + (normalizedIndex / (totalBars - 1)) * 0.9;
               
+              // Calculate slight scale variation for "breathing" effect
+              const scale = 0.8 + (normalizedIndex / (totalBars - 1)) * 0.2;
+
               return (
                 <motion.div
                   key={i}
-                  className="absolute left-1/2 top-0 w-[6px] h-[18px] -ml-[3px] origin-[50%_48px]"
+                  className="absolute left-1/2 top-0 origin-[50%_56px]"
                   style={{
-                    backgroundColor: '#3e2723', // Dark Brown color from your image
+                    width: '6px',
+                    height: '24px',
+                    marginLeft: '-3px', // Center the 6px width
+                    backgroundColor: '#44403C', // Stone-800: A premium dark grey/brown
+                    borderRadius: '9999px',
                     opacity: opacity,
-                    borderRadius: '99px', // Fully rounded caps
+                    willChange: "transform, opacity",
                   }}
-                  // Optional: Add a slight scale pulse to individual bars for extra life
-                  animate={{ scaleY: [1, 1.1, 1] }}
-                  transition={{ 
-                    duration: 0.8, 
-                    repeat: Infinity, 
+                  // Individual bar pulse for extra life
+                  animate={{ 
+                    scaleY: [1, 1.05, 1],
+                  }}
+                  transition={{
+                    duration: 1.2,
+                    repeat: Infinity,
                     delay: i * 0.05,
-                    ease: "easeInOut" 
+                    ease: "easeInOut",
+                    repeatType: "reverse"
                   }}
                 />
               );
             })}
           </motion.div>
+          
+          {/* Optional: Central Dot for focus (adds a nice anchor point) */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <motion.div 
+              className="w-1.5 h-1.5 bg-stone-800 rounded-full"
+              animate={{ scale: [1, 1.2, 1], opacity: [0.8, 1, 0.8] }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+            />
+          </div>
         </div>
 
-        {/* --- TEXT --- */}
-        <div className="text-center">
-          <motion.h1 
-            className="text-4xl font-bold text-[#3e2723] tracking-tight"
+        {/* --- TYPOGRAPHY --- */}
+        <div className="flex flex-col items-center gap-2">
+          <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            style={{ fontFamily: '"Merriweather", "Georgia", serif' }} // Bold Serif font
+            transition={{ duration: 0.6, ease: "easeOut" }}
+            className="flex items-baseline gap-1"
           >
-            Loading{dots}
-          </motion.h1>
-          
-          {/* Optional: Subtitle or Progress Percentage */}
-          {progress < 100 && (
-            <motion.p 
-              className="text-sm text-[#8d6e63] mt-2 font-medium"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.5 }}
-            >
-              {Math.round(progress)}% Complete
-            </motion.p>
-          )}
+            <h1 className="text-3xl font-bold tracking-tight text-stone-900">
+              Loading
+            </h1>
+            <span className="flex gap-0.5 h-6 items-end">
+              {[0, 1, 2].map((i) => (
+                <motion.span
+                  key={i}
+                  className="w-1.5 h-1.5 bg-stone-400 rounded-full"
+                  animate={{ 
+                    opacity: [0.2, 1, 0.2],
+                    y: [0, -4, 0]
+                  }}
+                  transition={{
+                    duration: 1.4,
+                    repeat: Infinity,
+                    delay: i * 0.2,
+                    ease: "easeInOut"
+                  }}
+                />
+              ))}
+            </span>
+          </motion.div>
+
+          {/* Progress Percentage - Monospace for stability */}
+          <motion.p 
+            className="text-xs font-medium tracking-widest text-stone-500 uppercase"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+          >
+            {Math.round(progress)}%
+          </motion.p>
         </div>
 
       </div>
