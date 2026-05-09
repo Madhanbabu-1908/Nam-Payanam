@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../config/api';
-import { tripService } from '../services/tripService'; // ✅ Import service
 import { useAuth } from '../context/AuthContext';
-import { ArrowLeft, Copy, Check, Crown, User, X, Hash, Link2 } from 'lucide-react';
+import { ArrowLeft, Copy, Check, Crown, X, Hash, Link2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function MembersPage() {
@@ -20,29 +19,43 @@ export default function MembersPage() {
   const load = async () => {
     if (!tripId) return;
     try {
-      // ✅ Use tripService for consistency
-      const [tripRes, memRes] = await Promise.all([
-        tripService.getById(tripId),
-        tripService.getMembers(tripId).catch(() => ({ data: { data: [] } })),
-      ]);
-      
-      const t = tripRes.data.data;
+      // 1. Fetch Trip Details
+      const tripRes = await api.get(`/trips/${tripId}`);
+      // Handle both { data: { data: ... } } and { data: ... } structures
+      const t = tripRes.data.data || tripRes.data; 
       setTrip(t);
       setIsOrg(t.organizer_id === user?.id);
 
-      const rawMembers = memRes.data.data || [];
+      // 2. Fetch Members
+      let rawMembers: any[] = [];
+      try {
+        const memRes = await api.get(`/trips/${tripId}/members`);
+        rawMembers = memRes.data.data || memRes.data || [];
+      } catch (err) {
+        console.warn("Failed to fetch members", err);
+        rawMembers = [];
+      }
+
+      // 3. Add organizer if not in list (Fallback for UI)
+      const organizerExists = rawMembers.find((m: any) => m.user_id === t.organizer_id);
       
-      // Add organizer if not in list (fallback for UI)
-      if (!rawMembers.find((m: any) => m.user_id === t.organizer_id)) {
+      if (!organizerExists && user) {
         rawMembers.unshift({ 
           user_id: t.organizer_id, 
           role: 'ORGANIZER', 
-          profiles: { email: user?.email, full_name: user?.user_metadata?.full_name } 
+          profiles: { 
+            email: user.email, 
+            full_name: user.user_metadata?.full_name || 'You' 
+          } 
         });
       }
+      
       setMembers(rawMembers);
-    } catch (e) { console.error(e); }
-    finally { setLoading(false); }
+    } catch (e) { 
+      console.error(e); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   useEffect(() => { load(); }, [tripId, user]);
@@ -50,7 +63,6 @@ export default function MembersPage() {
   const removeMember = async (memberId: string) => {
     if (!confirm('Remove this member from the trip?')) return;
     try {
-      // ✅ Ensure this endpoint exists in backend or use a different method
       await api.delete(`/trips/${tripId}/members/${memberId}`);
       setMembers(m => m.filter(x => x.user_id !== memberId));
       toast.success('Member removed');
