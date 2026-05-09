@@ -288,7 +288,7 @@ export const tripController = {
     }
   },
 
-  // ✅ MEMBERS (FIXED: Manual Join to avoid Schema Relationship Error)
+  // ✅ MEMBERS (FIXED: Manual Join to avoid Schema Relationship Error & Missing Columns)
   getMembers: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { tripId } = req.params;
@@ -309,10 +309,10 @@ export const tripController = {
       const userIds = members.map(m => m.user_id);
 
       // 3. Fetch profile details for these users
-      // Ensure your profiles table has an 'id' column that matches auth.users.id
+      // NOTE: Removed 'email' because it doesn't exist in public.profiles table
       const { data: profiles, error: profilesError } = await supabaseAdmin
         .from('profiles')
-        .select('id, full_name, email, avatar_url')
+        .select('id, full_name, avatar_url') 
         .in('id', userIds);
 
       if (profilesError) throw profilesError;
@@ -325,7 +325,7 @@ export const tripController = {
           role: member.role,
           profiles: profile ? {
             full_name: profile.full_name,
-            email: profile.email,
+            email: null, // Email is not in profiles table, set to null
             avatar_url: profile.avatar_url
           } : null
         };
