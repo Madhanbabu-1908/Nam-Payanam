@@ -10,32 +10,50 @@ import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
 
-// ✅ CRITICAL FIX: Trust the first proxy (Render) to fix X-Forwarded-For warning
+// ✅ CRITICAL: Trust the first proxy (Render) to get correct client IP for rate limiting
 app.set('trust proxy', 1);
 
 // 1. Security Middleware
-app.use(helmet());
+// Helmet helps secure Express apps by setting various HTTP headers.
+app.use(helmet({
+  crossOriginEmbedderPolicy: false, // Often needed for frontend assets
+  contentSecurityPolicy: false,     // Disabled to prevent conflicts with API responses during dev
+}));
 
-// 2. CORS Configuration
-// Allows requests from your Vercel frontend and localhost
+// 2. CORS Configuration - STRICT
+// Only allow requests from your specific Vercel domain and localhost
+const allowedOrigins = [
+  'http://localhost:3000', 
+  'http://localhost:5173', 
+  'https://nam-payanam.vercel.app' // YOUR PRODUCTION DOMAIN
+];
+
 app.use(cors({
-  origin: [
-    'http://localhost:3000', 
-    'https://nam-payanam.vercel.app', // Ensure this matches your actual Vercel URL
-    '*' // Temporary wildcard for debugging if needed (remove in strict production)
-  ],
-  credentials: true,
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl/postman)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.warn(`❌ CORS Blocked Origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  credentials: true, // Required for sending cookies/auth headers
+  optionsSuccessStatus: 200 // Some legacy browsers choke on 204
 }));
 
 // 3. Request Logging
 if (env.NODE_ENV !== 'production') {
-  app.use(morgan('dev'));
+  app.use(morgan('dev')); // Concise output for development
 } else {
-  app.use(morgan('combined'));
+  app.use(morgan('combined')); // Standard Apache combined log format for production
 }
 
 // 4. Body Parsing
-app.use(express.json({ limit: '10mb' })); // Increased limit for larger JSON payloads (e.g., AI responses)
+app.use(express.json({ limit: '10mb' })); // Increased limit for larger payloads (e.g., AI responses)
 app.use(express.urlencoded({ extended: true }));
 
 // 5. Rate Limiting (Prevent DDoS/Brute Force)
@@ -72,7 +90,7 @@ app.use((req, res) => {
 });
 
 // 9. Global Error Handler
-// Catches all errors from controllers (including AI errors) and middleware
+// Catches all errors from controllers and middleware
 app.use(errorHandler);
 
 export default app;
