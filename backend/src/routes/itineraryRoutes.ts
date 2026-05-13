@@ -18,4 +18,7 @@ router.put('/:id', requireOrganizer, itineraryController.updateStop);
 // DELETE /api/itinerary/:id (Delete Stop)
 router.delete('/:id', requireOrganizer, itineraryController.deleteStop);
 
+// POST /api/itinerary/:tripId (Add item)
+router.post('/:tripId', requireOrganizer, itineraryController.createItem);
+
 export default router;
