@@ -12,7 +12,7 @@ type Expense = {
   id: string;
   amount: number;
   description: string;
-  paid_by_user_id?: string; // Backend field
+  paid_by_user_id?: string;
   created_at?: string;
   profiles?: {
     full_name: string;
@@ -30,6 +30,7 @@ export default function ExpensesPage() {
 
   // 📥 Fetch expenses
   const fetchExpenses = async () => {
+    if (!tripId) return;
     try {
       const res = await api.get(`/expenses/${tripId}`);
       setExpenses(res.data.data || []);
@@ -46,8 +47,9 @@ export default function ExpensesPage() {
   }, [tripId]);
 
   // ➕ Add expense
-  const handleAddExpense = async (e: React.FormEvent) => {
-    e.preventDefault();    if (!amount || Number(amount) <= 0) {
+  const handleAddExpense = async (e: React.FormEvent) => {    e.preventDefault();
+    if (!tripId) return toast.error("Trip ID missing");
+    if (!amount || Number(amount) <= 0) {
       return toast.error("Please enter a valid amount");
     }
     if (!description.trim()) {
@@ -56,8 +58,8 @@ export default function ExpensesPage() {
 
     setAdding(true);
     try {
-      await api.post(`/expenses`, {
-        trip_id: tripId, // Ensure backend expects trip_id in body
+      // ✅ FIXED: Send tripId in URL to match backend route POST /expenses/:tripId
+      await api.post(`/expenses/${tripId}`, {
         amount: Number(amount),
         description,
       });
@@ -74,11 +76,11 @@ export default function ExpensesPage() {
     }
   };
 
-  // 🗑️ Delete expense (Optional)
+  // 🗑️ Delete expense
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this expense?")) return;
     try {
-      await api.delete(`/expenses/${id}`);
+      await api.delete(`/expenses/${tripId}/${id}`);
       setExpenses(prev => prev.filter(exp => exp.id !== id));
       toast.success("Expense deleted");
     } catch (err) {
@@ -94,9 +96,9 @@ export default function ExpensesPage() {
       
       {/* Header & Stats */}
       <header className="mb-8">
-        <h1 className="text-3xl font-display font-bold text-[var(--text)] mb-6 flex items-center gap-3">
-          <Wallet className="text-brand"/> Trip Expenses
-        </h1>        
+        <h1 className="text-3xl font-display font-bold text-[var(--text)] mb-6 flex items-center gap-3">          <Wallet className="text-brand"/> Trip Expenses
+        </h1>
+        
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="card p-5 bg-gradient-to-br from-brand to-brand/80 text-white shadow-lg shadow-brand/20">
             <p className="text-brand-100 text-sm font-medium mb-1">Total Spent</p>
@@ -144,8 +146,8 @@ export default function ExpensesPage() {
                   <IndianRupee size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]"/>
                 </div>
               </div>
-
-              <div>                <label className="label">Description</label>
+              <div>
+                <label className="label">Description</label>
                 <input
                   type="text"
                   placeholder="e.g. Lunch at Hotel Surya"
@@ -192,9 +194,9 @@ export default function ExpensesPage() {
           ) : (
             <div className="space-y-3">
               <AnimatePresence>
-                {expenses.map((exp) => (
-                  <motion.div
-                    key={exp.id}                    initial={{ opacity: 0, y: 10 }}
+                {expenses.map((exp) => (                  <motion.div
+                    key={exp.id}
+                    initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95 }}
                     className="card p-4 flex items-center justify-between group hover:border-brand/30 transition-colors"
