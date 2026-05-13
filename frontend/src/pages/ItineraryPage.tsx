@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   MapPin, Clock, Calendar, Sparkles, 
   Coffee, Utensils, Camera, Car, Footprints, 
-  PlusCircle, AlertCircle
+  PlusCircle, AlertCircle, MessageSquare
 } from "lucide-react";
 
 // ✅ Type matches backend response
@@ -198,12 +198,13 @@ export default function ItineraryPage() {
         ))}
       </div>
       
-      {/* Floating Action Button for Adding Manual Stop (Optional) */}
+      {/* ✅ FIXED: Floating Action Button now goes to AI Chat to add stops */}
       <button 
-        onClick={() => navigate(`/dashboard/${tripId}/itinerary/add`)}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-brand text-white rounded-full shadow-lg shadow-brand/30 flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-40"
+        onClick={() => navigate(`/dashboard/${tripId}/ai`)}
+        className="fixed bottom-6 right-6 w-14 h-14 bg-brand text-white rounded-full shadow-lg shadow-brand/30 flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-40 group"
+        title="Ask AI to add a stop"
       >
-        <PlusCircle size={24}/>
+        <MessageSquare size={24} className="group-hover:rotate-12 transition-transform"/>
       </button>
     </div>
   );
