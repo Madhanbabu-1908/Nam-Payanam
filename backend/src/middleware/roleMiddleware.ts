@@ -3,19 +3,35 @@ import { AuthRequest } from './authMiddleware';
 import { supabaseAdmin } from '../config/db';
 
 export const requireOrganizer = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  const tripId = req.params.tripId || req.body.tripId;
   const userId = req.user?.id;
+  
+  // 1. Try to get tripId from params or body first
+  let tripId = req.params.tripId || req.body.tripId;
 
   if (!userId) {
     return res.status(401).json({ success: false, error: 'User not authenticated' });
   }
 
+  // 2. If tripId is missing (e.g., DELETE /itinerary/:itemId), fetch it from the item
+  if (!tripId && req.params.id) {
+    const { data: item } = await supabaseAdmin
+      .from('itinerary_items')
+      .select('trip_id')
+      .eq('id', req.params.id)
+      .single();
+
+    if (item) {
+      tripId = item.trip_id;
+    }
+  }
+
+  // 3. Final check if we still don't have a tripId
   if (!tripId) {
     return res.status(400).json({ success: false, error: 'Trip ID missing' });
   }
 
   try {
-    // Directly check the database for organizer status
+    // 4. Check if user is the organizer of this trip
     const { data: trip, error } = await supabaseAdmin
       .from('trips')
       .select('organizer_id')
