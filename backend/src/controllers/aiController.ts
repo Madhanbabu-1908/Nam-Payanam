@@ -8,10 +8,10 @@ export const aiController = {
   regenerateItinerary: async (req: Request, res: Response) => {
     try {
       const { tripId } = req.params;
-      const { interests } = req.body; // Allow frontend to send updated interests
+      const { interests } = req.body;
 
-      // 1. Fetch Trip Details from Database
-      const {  trip, error: tripError } = await supabaseAdmin
+      // 1. Fetch Trip Details
+      const { data: trip, error: tripError } = await supabaseAdmin
         .from('trips')
         .select('*')
         .eq('id', tripId)
@@ -27,7 +27,7 @@ export const aiController = {
       const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
       const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
 
-      // 3. Construct a Rich Prompt
+      // 3. Construct Prompt
       const prompt = `
         You are an expert travel planner for Nam Payanam.
         Create a detailed ${days}-day itinerary for a trip to ${trip.destination}.
@@ -60,7 +60,7 @@ export const aiController = {
       // 4. Call AI Service
       const result = await aiService.generateItinerary(prompt);
 
-      // 5. Save to Database (itinerary_items table)
+      // 5. Save to Database
       if (result.days && Array.isArray(result.days)) {
         const itemsToInsert = result.days.flatMap((day: any) =>
           (day.activities || []).map((act: any) => ({
@@ -69,7 +69,6 @@ export const aiController = {
             time_slot: act.time,
             location_name: act.place,
             description: act.notes,
-            // Optional: Add lat/lng if AI provides them, otherwise null
             latitude: null, 
             longitude: null,
             estimated_cost: null,
@@ -78,7 +77,7 @@ export const aiController = {
         );
 
         if (itemsToInsert.length > 0) {
-          // Delete old itinerary items for this trip first to avoid duplicates
+          // Delete old items
           await supabaseAdmin.from('itinerary_items').delete().eq('trip_id', tripId);
           
           // Insert new items
@@ -88,7 +87,6 @@ export const aiController = {
             
           if (insertError) {
             console.error("Failed to save itinerary to DB:", insertError);
-            // We don't throw here because we still want to return the AI response to the user
           } else {
             console.log(`✅ Saved ${itemsToInsert.length} itinerary items to DB`);
           }
@@ -96,9 +94,9 @@ export const aiController = {
       }
 
       return res.json({
-        success: true,         result,
+        success: true,
+        data: result,
       });
-
     } catch (err: any) {
       console.error("AI regenerate error:", err.message);
       return res.status(500).json({
@@ -109,7 +107,7 @@ export const aiController = {
     }
   },
 
-  // ✅ 2. Chat (Improved with Context)
+  // ✅ 2. Chat
   chat: async (req: Request, res: Response) => {
     try {
       const { message } = req.body;
@@ -119,8 +117,8 @@ export const aiController = {
         return res.status(400).json({ success: false, message: "Message is required" });
       }
 
-      // Optional: Fetch trip context for better answers
-      const {  trip } = await supabaseAdmin
+      // Fetch trip context
+      const { data: trip } = await supabaseAdmin
         .from('trips')
         .select('destination, budget, start_date, end_date')
         .eq('id', tripId)
@@ -132,7 +130,10 @@ export const aiController = {
 
       const reply = await aiService.chat(`${context} User Question: ${message}`);
 
-      return res.json({ success: true,  reply });
+      return res.json({ 
+        success: true, 
+        data: reply 
+      });
     } catch (err: any) {
       console.error("AI chat error:", err.message);
       return res.status(500).json({ success: false, message: "Chat failed" });
@@ -143,8 +144,7 @@ export const aiController = {
   getChatHistory: async (req: Request, res: Response) => {
     try {
       const { tripId } = req.params;
-      // For now, return empty array. You can implement a chat_history table later.
-      return res.json({ success: true,  [] });
+      return res.json({ success: true, data: [] });
     } catch (err: any) {      console.error("Chat history error:", err.message);
       return res.status(500).json({ success: false, message: "Failed to fetch chat history" });
     }
@@ -156,7 +156,7 @@ export const aiController = {
       const { tripId } = req.params;
       const input = `Analyze budget for trip ID: ${tripId}`;
       const result = await aiService.analyzeBudget(input);
-      return res.json({ success: true,  result });
+      return res.json({ success: true, data: result });
     } catch (err: any) {
       console.error("Budget error:", err.message);
       return res.status(500).json({ success: false, message: "Budget analysis failed" });
@@ -169,7 +169,7 @@ export const aiController = {
       const { tripId } = req.params;
       const input = `Summarize trip ID: ${tripId}`;
       const result = await aiService.generateSummary(input);
-      return res.json({ success: true,  result });
+      return res.json({ success: true, data: result });
     } catch (err: any) {
       console.error("Summary error:", err.message);
       return res.status(500).json({ success: false, message: "Summary failed" });
